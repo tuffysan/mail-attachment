@@ -6,6 +6,8 @@ import {
   createEmailAccount,
   deleteEmailAccount,
   listEmailAccounts,
+  startOAuth,
+  syncEmailAccount,
   testEmailAccount,
 } from '../api'
 import type { EmailAccount, EmailAccountCreate } from '../types'
@@ -29,7 +31,7 @@ export function EmailAccountsPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
-  const [testingId, setTestingId] = useState('')
+  const [activeAccountId, setActiveAccountId] = useState('')
 
   async function reload() {
     try {
@@ -38,77 +40,120 @@ export function EmailAccountsPage() {
       if (caught instanceof ApiError && caught.status === 401) {
         clearToken()
         navigate('/login', { replace: true })
-      } else {
-        setError('E-postkontona kunde inte läsas.')
+        return
       }
+
+      setError('E-postkontona kunde inte läsas.')
     }
   }
 
-  useEffect(() => { void reload() }, [])
+  useEffect(() => {
+    void reload()
+  }, [])
 
-  async function submit(event: FormEvent) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setBusy(true)
     setError('')
     setNotice('')
+
     try {
       await createEmailAccount(form)
       setForm(emptyForm)
       setNotice('Kontot sparades. Testa anslutningen innan det används.')
       await reload()
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Kontot kunde inte sparas.')
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Kontot kunde inte sparas.',
+      )
     } finally {
       setBusy(false)
     }
   }
 
   async function connectOAuth(provider: 'google' | 'microsoft') {
-        setError('')
-        try {
-          const result = await startOAuth(provider)
-          window.location.href = result.authorization_url
-        } catch (caught) {
-          setError(caught instanceof ApiError ? caught.message : 'OAuth kunde inte startas.')
-        }
-      }
-
-      async function syncAccount(account: EmailAccount) {
-        setTestingId(account.id)
-        try {
-          const result = await syncEmailAccount(account.id)
-          setNotice(`${account.name}: ${result.messages_created} nya meddelanden och ${result.attachments_created} bilagor.`)
-          await reload()
-        } catch (caught) {
-          setError(caught instanceof ApiError ? caught.message : 'Synkroniseringen misslyckades.')
-        } finally {
-          setTestingId('')
-        }
-      }
-
-      async function testAccount(account: EmailAccount) {
-    setTestingId(account.id)
     setError('')
     setNotice('')
+
     try {
-      const result = await testEmailAccount(account.id)
-      setNotice(`${account.name}: anslutningen fungerar. ${result.message_count ?? 0} meddelanden i ${result.mailbox}.`)
+      const result = await startOAuth(provider)
+      window.location.href = result.authorization_url
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'OAuth kunde inte startas.',
+      )
+    }
+  }
+
+  async function syncAccount(account: EmailAccount) {
+    setActiveAccountId(account.id)
+    setError('')
+    setNotice('')
+
+    try {
+      const result = await syncEmailAccount(account.id)
+      setNotice(
+        `${account.name}: ${result.messages_created} nya meddelanden och ` +
+          `${result.attachments_created} bilagor.`,
+      )
       await reload()
     } catch (caught) {
-      setError(caught instanceof ApiError ? `${account.name}: ${caught.message}` : 'Anslutningstestet misslyckades.')
+      setError(
+        caught instanceof ApiError
+          ? `${account.name}: ${caught.message}`
+          : 'Synkroniseringen misslyckades.',
+      )
+    } finally {
+      setActiveAccountId('')
+    }
+  }
+
+  async function testAccount(account: EmailAccount) {
+    setActiveAccountId(account.id)
+    setError('')
+    setNotice('')
+
+    try {
+      const result = await testEmailAccount(account.id)
+      setNotice(
+        `${account.name}: anslutningen fungerar. ` +
+          `${result.message_count ?? 0} meddelanden i ${result.mailbox}.`,
+      )
+      await reload()
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? `${account.name}: ${caught.message}`
+          : 'Anslutningstestet misslyckades.',
+      )
       await reload()
     } finally {
-      setTestingId('')
+      setActiveAccountId('')
     }
   }
 
   async function remove(account: EmailAccount) {
-    if (!window.confirm(`Ta bort e-postkontot ${account.name}?`)) return
+    if (!window.confirm(`Ta bort e-postkontot ${account.name}?`)) {
+      return
+    }
+
+    setError('')
+    setNotice('')
+
     try {
       await deleteEmailAccount(account.id)
+      setNotice(`${account.name} har tagits bort.`)
       await reload()
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Kontot kunde inte tas bort.')
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Kontot kunde inte tas bort.',
+      )
     }
   }
 
@@ -119,53 +164,167 @@ export function EmailAccountsPage() {
           <p className="eyebrow">Mail Attachment Hub</p>
           <h1>E-postkonton</h1>
         </div>
-        <Link className="button-link secondary" to="/">Till översikten</Link>
+        <Link className="button-link secondary" to="/">
+          Till översikten
+        </Link>
       </header>
 
       <main className="content two-column">
         <section className="panel">
           <p className="eyebrow">Nytt konto</p>
-          <h2>Lägg till IMAP-konto</h2>
-              <div className="oauth-actions">
-                <button type="button" className="secondary" onClick={() => connectOAuth('google')}>Anslut Gmail med Google</button>
-                <button type="button" className="secondary" onClick={() => connectOAuth('microsoft')}>Anslut Microsoft 365</button>
-              </div>
-          <p className="muted">Lösenordet krypteras innan det sparas i databasen.</p>
-          {error && <div className="alert" role="alert">{error}</div>}
-          {notice && <div className="success" role="status">{notice}</div>}
+          <h2>Lägg till e-postkonto</h2>
+
+          <div className="oauth-actions">
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => void connectOAuth('google')}
+            >
+              Anslut Gmail med Google
+            </button>
+
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => void connectOAuth('microsoft')}
+            >
+              Anslut Microsoft 365
+            </button>
+          </div>
+
+          <p className="muted">
+            Du kan även lägga till ett vanligt IMAP-konto. Lösenordet
+            krypteras innan det sparas i databasen.
+          </p>
+
+          {error && (
+            <div className="alert" role="alert">
+              {error}
+            </div>
+          )}
+
+          {notice && (
+            <div className="success" role="status">
+              {notice}
+            </div>
+          )}
+
           <form onSubmit={submit}>
             <label htmlFor="name">Namn</label>
-            <input id="name" required value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} placeholder="Fakturor" />
+            <input
+              id="name"
+              required
+              value={form.name}
+              onChange={(event) =>
+                setForm({ ...form, name: event.target.value })
+              }
+              placeholder="Fakturor"
+            />
 
             <label htmlFor="email">E-postadress</label>
-            <input id="email" type="email" required value={form.email_address} onChange={(e) => setForm({...form, email_address: e.target.value, username: form.username || e.target.value})} />
+            <input
+              id="email"
+              type="email"
+              required
+              value={form.email_address}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  email_address: event.target.value,
+                  username: form.username || event.target.value,
+                })
+              }
+            />
 
             <label htmlFor="host">IMAP-server</label>
-            <input id="host" required value={form.host} onChange={(e) => setForm({...form, host: e.target.value})} />
+            <input
+              id="host"
+              required
+              value={form.host}
+              onChange={(event) =>
+                setForm({ ...form, host: event.target.value })
+              }
+            />
 
             <div className="form-row">
               <div>
                 <label htmlFor="port">Port</label>
-                <input id="port" type="number" min="1" max="65535" required value={form.port} onChange={(e) => setForm({...form, port: Number(e.target.value)})} />
+                <input
+                  id="port"
+                  type="number"
+                  min="1"
+                  max="65535"
+                  required
+                  value={form.port}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      port: Number(event.target.value),
+                    })
+                  }
+                />
               </div>
+
               <div>
                 <label htmlFor="mailbox">Mapp</label>
-                <input id="mailbox" required value={form.mailbox} onChange={(e) => setForm({...form, mailbox: e.target.value})} />
+                <input
+                  id="mailbox"
+                  required
+                  value={form.mailbox}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      mailbox: event.target.value,
+                    })
+                  }
+                />
               </div>
             </div>
 
             <label htmlFor="username">Användarnamn</label>
-            <input id="username" required value={form.username} onChange={(e) => setForm({...form, username: e.target.value})} />
+            <input
+              id="username"
+              required
+              value={form.username}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  username: event.target.value,
+                })
+              }
+            />
 
             <label htmlFor="password">Lösenord eller applösenord</label>
-            <input id="password" type="password" required value={form.password} onChange={(e) => setForm({...form, password: e.target.value})} />
+            <input
+              id="password"
+              type="password"
+              required
+              value={form.password}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  password: event.target.value,
+                })
+              }
+            />
 
             <label className="checkbox-row">
-              <input type="checkbox" checked={form.use_ssl} onChange={(e) => setForm({...form, use_ssl: e.target.checked})} />
+              <input
+                type="checkbox"
+                checked={form.use_ssl}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    use_ssl: event.target.checked,
+                  })
+                }
+              />
               Använd SSL/TLS
             </label>
 
-            <button disabled={busy}>{busy ? 'Sparar…' : 'Spara konto'}</button>
+            <button disabled={busy}>
+              {busy ? 'Sparar…' : 'Spara konto'}
+            </button>
           </form>
         </section>
 
@@ -173,32 +332,80 @@ export function EmailAccountsPage() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Konfigurerade konton</p>
-              <h2>{accounts.length} konto{accounts.length === 1 ? '' : 'n'}</h2>
+              <h2>
+                {accounts.length} konto{accounts.length === 1 ? '' : 'n'}
+              </h2>
             </div>
           </div>
+
           <div className="account-list">
-            {accounts.map((account) => (
-              <article className="account-card" key={account.id}>
-                <div>
-                  <div className="account-title">
-                    <h3>{account.name}</h3>
-                    <span className={`status-pill ${account.last_test_status === 'ok' ? 'ok' : 'pending'}`}>
-                      {account.last_test_status === 'ok' ? 'Verifierat' : account.last_test_status === 'failed' ? 'Fel' : 'Ej testat'}
-                    </span>
+            {accounts.map((account) => {
+              const isActive = activeAccountId === account.id
+
+              return (
+                <article className="account-card" key={account.id}>
+                  <div>
+                    <div className="account-title">
+                      <h3>{account.name}</h3>
+                      <span
+                        className={`status-pill ${
+                          account.last_test_status === 'ok'
+                            ? 'ok'
+                            : 'pending'
+                        }`}
+                      >
+                        {account.last_test_status === 'ok'
+                          ? 'Verifierat'
+                          : account.last_test_status === 'failed'
+                            ? 'Fel'
+                            : 'Ej testat'}
+                      </span>
+                    </div>
+
+                    <p>{account.email_address}</p>
+                    <p className="muted">
+                      {account.host}:{account.port} · {account.mailbox}
+                    </p>
+
+                    {account.last_test_message && (
+                      <p className="small">{account.last_test_message}</p>
+                    )}
                   </div>
-                  <p>{account.email_address}</p>
-                  <p className="muted">{account.host}:{account.port} · {account.mailbox}</p>
-                  {account.last_test_message && <p className="small">{account.last_test_message}</p>}
-                </div>
-                <div className="card-actions">
-                  <button className="secondary" disabled={testingId === account.id} onClick={() => testAccount(account)}>
-                    {testingId === account.id ? 'Testar…' : 'Testa'}
-                  </button>
-                  <button className="danger" onClick={() => remove(account)}>Ta bort</button>
-                </div>
-              </article>
-            ))}
-            {accounts.length === 0 && <div className="empty-state">Inga e-postkonton är konfigurerade ännu.</div>}
+
+                  <div className="card-actions">
+                    <button
+                      className="secondary"
+                      disabled={isActive}
+                      onClick={() => void testAccount(account)}
+                    >
+                      {isActive ? 'Arbetar…' : 'Testa'}
+                    </button>
+
+                    <button
+                      className="secondary"
+                      disabled={isActive}
+                      onClick={() => void syncAccount(account)}
+                    >
+                      {isActive ? 'Arbetar…' : 'Synkronisera'}
+                    </button>
+
+                    <button
+                      className="danger"
+                      disabled={isActive}
+                      onClick={() => void remove(account)}
+                    >
+                      Ta bort
+                    </button>
+                  </div>
+                </article>
+              )
+            })}
+
+            {accounts.length === 0 && (
+              <div className="empty-state">
+                Inga e-postkonton är konfigurerade ännu.
+              </div>
+            )}
           </div>
         </section>
       </main>
