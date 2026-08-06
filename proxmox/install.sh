@@ -65,10 +65,13 @@ require_environment() {
 
 choose_ctid() {
   [[ -n "$CTID" ]] || CTID="$(pvesh get /cluster/nextid)"
-  pct status "$CTID" >/dev/null 2>&1 && {
+
+  if pct status "$CTID" >/dev/null 2>&1; then
     echo "LXC-ID ${CTID} används redan."
     exit 1
-  }
+  fi
+
+  return 0
 }
 
 validate_storage() {
