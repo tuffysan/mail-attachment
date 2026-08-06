@@ -68,6 +68,19 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ADMIN_DISPLAY_NAME: ${ADMIN_DISPLAY_NAME:-Administrator}
       IMAP_TIMEOUT_SECONDS: ${IMAP_TIMEOUT_SECONDS:-15}
+      SYNC_INTERVAL_SECONDS: ${SYNC_INTERVAL_SECONDS:-300}
+      SYNC_BATCH_SIZE: ${SYNC_BATCH_SIZE:-100}
+      SYNC_RETRY_ATTEMPTS: ${SYNC_RETRY_ATTEMPTS:-3}
+      SYNC_RETRY_DELAY_SECONDS: ${SYNC_RETRY_DELAY_SECONDS:-10}
+      ATTACHMENT_DATA_DIR: /data/attachments
+      EXTRACT_ZIP_ATTACHMENTS: ${EXTRACT_ZIP_ATTACHMENTS:-true}
+      MAX_ZIP_FILES: ${MAX_ZIP_FILES:-100}
+      MAX_ZIP_EXPANDED_BYTES: ${MAX_ZIP_EXPANDED_BYTES:-104857600}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID:-common}
       TZ: ${TZ:-UTC}
     ports:
       - "${BACKEND_BIND_ADDRESS:-127.0.0.1}:${BACKEND_PORT:-8080}:8080"
@@ -86,6 +99,48 @@ services:
       timeout: 3s
       retries: 10
       start_period: 15s
+    volumes:
+      - attachment_data:/data/attachments
+    networks:
+      - mailhub_internal
+    security_opt:
+      - no-new-privileges:true
+
+  worker:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    command: ["python", "-m", "mailhub.worker"]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mailhub}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mailhub}
+      REDIS_URL: redis://redis:6379/0
+      APP_SECRET_KEY: ${APP_SECRET_KEY}
+      IMAP_TIMEOUT_SECONDS: ${IMAP_TIMEOUT_SECONDS:-15}
+      SYNC_INTERVAL_SECONDS: ${SYNC_INTERVAL_SECONDS:-300}
+      SYNC_BATCH_SIZE: ${SYNC_BATCH_SIZE:-100}
+      SYNC_RETRY_ATTEMPTS: ${SYNC_RETRY_ATTEMPTS:-3}
+      SYNC_RETRY_DELAY_SECONDS: ${SYNC_RETRY_DELAY_SECONDS:-10}
+      ATTACHMENT_DATA_DIR: /data/attachments
+      EXTRACT_ZIP_ATTACHMENTS: ${EXTRACT_ZIP_ATTACHMENTS:-true}
+      MAX_ZIP_FILES: ${MAX_ZIP_FILES:-100}
+      MAX_ZIP_EXPANDED_BYTES: ${MAX_ZIP_EXPANDED_BYTES:-104857600}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID:-common}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - attachment_data:/data/attachments
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     networks:
       - mailhub_internal
     security_opt:
@@ -118,3 +173,4 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  attachment_data:

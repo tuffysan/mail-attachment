@@ -79,3 +79,15 @@ export function deleteEmailAccount(id: string): Promise<void> {
 export function testEmailAccount(id: string): Promise<ConnectionTestResponse> {
   return request<ConnectionTestResponse>(`/api/v1/email-accounts/${id}/test`, { method: 'POST' })
 }
+
+export function syncEmailAccount(id: string): Promise<{status:string;messages_created:number;attachments_created:number}> {
+  return request(`/api/v1/email-accounts/${id}/sync`, { method: 'POST' })
+}
+
+export function startOAuth(provider: 'google' | 'microsoft'): Promise<{authorization_url:string}> {
+  return request(`/api/v1/oauth/${provider}/start`)
+}
+
+export function listActivity(): Promise<Array<{id:string;level:string;event_type:string;message:string;created_at:string}>> {
+  return request('/api/v1/activity')
+}

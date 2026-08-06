@@ -64,3 +64,5 @@ button.danger:hover { background: #991b1b; }
 .small { font-size: .82rem; color: #94a3b8; }
 @media (max-width: 900px) { .two-column { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } .account-card { align-items: flex-start; flex-direction: column; } }
+
+.oauth-actions{display:grid;gap:8px;margin:16px 0}.oauth-actions button{margin:0}

@@ -1,75 +1,50 @@
 # Mail Attachment Hub
 
-Mail Attachment Hub is an open-source service for collecting email attachments and routing them to configured storage destinations. The project is built incrementally, with every step remaining runnable and reviewable.
+Mail Attachment Hub is an open-source service that securely collects email attachments and routes them to configured storage destinations.
 
 ## Current delivery
+**Sprint 0 · Step 008 — complete email ingestion engine**
 
-**Sprint 0 · Step 007 — multiple IMAP accounts and connection testing**
+This snapshot includes:
+- FastAPI, React, PostgreSQL and Redis
+- local administrator login and JWT
+- encrypted multi-account IMAP configuration
+- Gmail and Microsoft 365 OAuth/XOAUTH2 foundations
+- scheduled worker and manual sync
+- UID-based incremental mailbox scanning
+- MIME and attachment extraction
+- bounded ZIP expansion
+- duplicate protection, retry runs and activity history
+- persistent attachment staging volume
+- Docker Compose and GitHub Actions tests
 
-The repository currently provides:
+Rules and external storage routing arrive in Steps 009–010.
 
-- FastAPI backend and React web interface
-- local administrator login with JWT
-- PostgreSQL 16 and Redis 7
-- asynchronous SQLAlchemy and Alembic migrations
-- multiple encrypted IMAP email accounts
-- authenticated email-account CRUD API
-- IMAP mailbox connection testing
-- Swedish account-management interface
-- liveness and dependency-aware readiness endpoints
-- Docker Compose healthchecks and GitHub Actions CI
-
-Gmail OAuth, mailbox polling, attachment extraction, routing rules, storage integrations and the Proxmox production installer arrive in later steps.
-
-## Requirements
-
-- Git
-- Docker Engine with Docker Compose v2
-- GNU Make and Bash for convenience commands
-
-Windows users can use WSL 2 or Git Bash, or invoke Docker Compose directly.
-
-## Start locally
-
+## Start
 ```bash
 make init
 make check
 make test
 make up
-make api-smoke
-make migration-smoke
-make auth-smoke
-make frontend-smoke
-make email-account-smoke
+make mail-engine-smoke
 ```
 
 Open:
-
-- Web UI: `http://127.0.0.1:3000`
+- UI: `http://127.0.0.1:3000`
 - API docs: `http://127.0.0.1:8080/docs`
 
-The generated administrator credentials are written to the local `.env` file by `make init`. Never commit `.env`.
-
-## IMAP accounts
-
-After signing in, open **E-postkonton**. For Gmail with an app password use:
-
-- Server: `imap.gmail.com`
-- Port: `993`
-- SSL/TLS: enabled
-- Username: full Gmail address
-- Password: Google app password
-
-Native Gmail OAuth/XOAUTH2 is planned for the next OAuth delivery.
-
-## Common commands
-
-```bash
-make help
-make ps
-make logs
-make down
-make reset
+## OAuth
+Add OAuth app credentials to `.env`:
+```env
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+MICROSOFT_TENANT_ID=common
 ```
+Register callback URLs shown by the API host:
+- `/api/v1/oauth/google/callback`
+- `/api/v1/oauth/microsoft/callback`
 
-Read `STEP.md` for the exact scope and acceptance criteria.
+## Data safety
+Passwords and OAuth tokens are encrypted with a key derived from `APP_SECRET_KEY`. Never change that secret after accounts have been configured unless credentials are re-entered.

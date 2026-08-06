@@ -1,42 +1,36 @@
-# Sprint 0 · Step 007
+# Sprint 0 · Step 008
 
 ## Goal
-
-Add the first real email integration layer: multiple encrypted IMAP accounts, account management APIs, connection testing and a user-friendly web page.
+Deliver the complete email ingestion engine as one coherent increment.
 
 ## Included
+- password IMAP and XOAUTH2 authentication
+- Google Gmail and Microsoft 365 OAuth authorization-code flows
+- encrypted refresh/access tokens
+- scheduled worker with retry attempts
+- manual sync endpoint
+- UID-based incremental mailbox scanning
+- MIME parsing and safe attachment extraction
+- optional bounded ZIP extraction
+- local attachment staging volume
+- message, attachment, sync-run and activity-event tables
+- per-message and per-attachment duplicate protection
+- message/activity APIs and worker smoke tests
+- UI buttons for OAuth and manual synchronization
 
-- `email_accounts` database table and Alembic revision `0003`
-- encrypted IMAP passwords using a key derived from `APP_SECRET_KEY`
-- authenticated CRUD API for multiple email accounts
-- safe IMAP connection and mailbox test
-- support for SSL/TLS and selectable mailbox
-- React page for adding, listing, testing and deleting accounts
-- Gmail-friendly defaults (`imap.gmail.com`, port 993, SSL)
-- backend unit tests and end-to-end CRUD smoke test
-- CI coverage for the new API and frontend files
-
-## Not included yet
-
-- Gmail OAuth/XOAUTH2
-- scheduled mailbox polling
-- attachment download
-- attachment rules
-- storage destinations
-- Proxmox production installer
+## Operational notes
+OAuth requires application credentials in `.env` and exact callback URLs registered with Google or Microsoft.
+Extracted attachments remain in the Docker `attachment_data` volume until routing/storage is added in Step 010.
 
 ## Acceptance criteria
-
 ```bash
 make init
 make check
 make test
 make up
-make api-smoke
 make migration-smoke
 make auth-smoke
 make frontend-smoke
 make email-account-smoke
+make mail-engine-smoke
 ```
-
-Open `http://127.0.0.1:3000`, sign in and create an IMAP account from **E-postkonton**.

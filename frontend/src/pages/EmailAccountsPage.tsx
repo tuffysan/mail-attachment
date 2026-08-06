@@ -63,7 +63,30 @@ export function EmailAccountsPage() {
     }
   }
 
-  async function testAccount(account: EmailAccount) {
+  async function connectOAuth(provider: 'google' | 'microsoft') {
+        setError('')
+        try {
+          const result = await startOAuth(provider)
+          window.location.href = result.authorization_url
+        } catch (caught) {
+          setError(caught instanceof ApiError ? caught.message : 'OAuth kunde inte startas.')
+        }
+      }
+
+      async function syncAccount(account: EmailAccount) {
+        setTestingId(account.id)
+        try {
+          const result = await syncEmailAccount(account.id)
+          setNotice(`${account.name}: ${result.messages_created} nya meddelanden och ${result.attachments_created} bilagor.`)
+          await reload()
+        } catch (caught) {
+          setError(caught instanceof ApiError ? caught.message : 'Synkroniseringen misslyckades.')
+        } finally {
+          setTestingId('')
+        }
+      }
+
+      async function testAccount(account: EmailAccount) {
     setTestingId(account.id)
     setError('')
     setNotice('')
@@ -103,6 +126,10 @@ export function EmailAccountsPage() {
         <section className="panel">
           <p className="eyebrow">Nytt konto</p>
           <h2>Lägg till IMAP-konto</h2>
+              <div className="oauth-actions">
+                <button type="button" className="secondary" onClick={() => connectOAuth('google')}>Anslut Gmail med Google</button>
+                <button type="button" className="secondary" onClick={() => connectOAuth('microsoft')}>Anslut Microsoft 365</button>
+              </div>
           <p className="muted">Lösenordet krypteras innan det sparas i databasen.</p>
           {error && <div className="alert" role="alert">{error}</div>}
           {notice && <div className="success" role="status">{notice}</div>}
