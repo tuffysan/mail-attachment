@@ -1,39 +1,20 @@
-# Sprint 0 · Step 010
+# Mail Attachment Hub v1.0.0
 
-## Goal
+Steps 011 and 012 are merged into this production release.
 
-Deliver one storage platform that supports local and remote destinations through a common encrypted configuration and upload interface.
+Included:
+- complete email ingestion, rule and storage platforms
+- administration statistics and audit logs
+- API key foundation
+- backup and restore
+- diagnostics and update scripts
+- production Caddy/HTTPS profile
+- Docker one-line installer
+- Proxmox LXC one-line installer
+- release automation and upgrade-safe migrations
+- operational and troubleshooting documentation
 
-## Included
-
-- local filesystem
-- Google Drive
-- Microsoft OneDrive
-- Dropbox
-- Amazon S3 and S3-compatible services
-- MinIO
-- Azure Blob Storage
-- WebDAV and Nextcloud
-- SFTP
-- SMB/NAS
-- rclone installed in backend and worker images
-- encrypted provider configuration
-- multiple accounts for every provider
-- connection testing and stored health state
-- provider-aware upload with retries
-- existing per-rule/per-attachment/per-destination deduplication
-- storage management API and React page
-- migration `0006`
-- unit and CI smoke tests
-
-## Authentication notes
-
-OAuth-capable rclone providers accept an rclone-compatible `token` JSON value.
-Tokens can be generated using `rclone authorize <provider>` on a trusted computer.
-A later production wizard may automate more of this flow.
-
-## Acceptance criteria
-
+Validation:
 ```bash
 make init
 make check
@@ -46,4 +27,5 @@ make email-account-smoke
 make mail-engine-smoke
 make rule-engine-smoke
 make storage-platform-smoke
+make doctor
 ```

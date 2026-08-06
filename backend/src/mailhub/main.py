@@ -10,6 +10,7 @@ from mailhub.api.email_accounts import router as email_accounts_router
 from mailhub.api.mail_engine import router as mail_engine_router
 from mailhub.api.rules import router as rules_router
 from mailhub.api.storage import router as storage_router
+from mailhub.api.admin import router as admin_router
 from mailhub.auth.bootstrap import ensure_bootstrap_admin
 from mailhub.config import get_settings
 from mailhub.db import close_database, initialize_database
@@ -80,3 +81,4 @@ app.include_router(email_accounts_router)
 app.include_router(mail_engine_router)
 app.include_router(rules_router)
 app.include_router(storage_router)
+app.include_router(admin_router)

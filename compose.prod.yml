@@ -1,0 +1,35 @@
+services:
+  postgres:
+    ports: []
+  redis:
+    ports: []
+  backend:
+    environment:
+      APP_ENV: production
+    ports: []
+  frontend:
+    ports: []
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      EMAIL: ${LETSENCRYPT_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_healthy
+    networks:
+      - mailhub_internal
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  caddy_data:
+  caddy_config:

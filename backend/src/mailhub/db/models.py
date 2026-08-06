@@ -173,3 +173,30 @@ class RuleExecution(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     target_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ApiKey(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "api_keys"
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    prefix: Mapped[str] = mapped_column(String(16), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class NotificationEndpoint(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "notification_endpoints"
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    encrypted_config: Mapped[str] = mapped_column(Text, nullable=False)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+
+
+class AuditLog(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "audit_logs"
+    user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    entity_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    entity_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    details_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    remote_address: Mapped[str | None] = mapped_column(String(128), nullable=True)

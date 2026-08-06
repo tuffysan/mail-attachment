@@ -82,6 +82,7 @@ export function DashboardPage() {
           <Link className="button-link" to="/email-accounts">Hantera e-postkonton</Link>
           <Link className="button-link" to="/rules">Hantera regler</Link>
           <Link className="button-link secondary" to="/storage">Hantera lagring</Link>
+          <Link className="button-link secondary" to="/admin">Administration</Link>
         </section>
       </main>
     </div>
