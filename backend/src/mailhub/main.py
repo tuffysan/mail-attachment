@@ -15,6 +15,7 @@ from mailhub.auth.bootstrap import ensure_bootstrap_admin
 from mailhub.config import get_settings
 from mailhub.db import close_database, initialize_database
 from mailhub.health import run_readiness_checks
+from mailhub.core.errors import install_exception_handlers
 from mailhub.core.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from mailhub.logging_config import configure_logging
 
@@ -42,6 +43,7 @@ app = FastAPI(
     redoc_url=None,
     lifespan=lifespan,
 )
+install_exception_handlers(app)
 
 excluded_paths = {
     path.strip()

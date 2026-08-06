@@ -42,6 +42,9 @@ class RequestContextMiddleware:
 
         request_id = _header(scope, self.request_id_header) or str(uuid4())
         correlation_id = _header(scope, self.correlation_id_header) or request_id
+        state = scope.setdefault("state", {})
+        state["request_id"] = request_id
+        state["correlation_id"] = correlation_id
         request_token = request_id_var.set(request_id)
         correlation_token = correlation_id_var.set(correlation_id)
         started = time.perf_counter()
