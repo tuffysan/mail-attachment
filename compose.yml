@@ -90,7 +90,7 @@ services:
       STORAGE_RETRY_ATTEMPTS: ${STORAGE_RETRY_ATTEMPTS:-3}
       TZ: ${TZ:-UTC}
     ports:
-      - "${BACKEND_BIND_ADDRESS:-127.0.0.1}:${BACKEND_PORT:-8080}:8080"
+      - "${BACKEND_BIND_ADDRESS:-0.0.0.0}:${BACKEND_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -167,7 +167,7 @@ services:
       context: ./frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-3000}:80"
+      - "${FRONTEND_BIND_ADDRESS:-0.0.0.0}:${FRONTEND_PORT:-3000}:80"
     depends_on:
       backend:
         condition: service_healthy

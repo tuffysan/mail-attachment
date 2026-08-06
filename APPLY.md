@@ -1,38 +1,39 @@
-# Lägg in den korrigerade Proxmox-installern
+# Apply complete LXC installer fix
 
-## Kopiera filerna
+Copy these files over the repository:
+
+- `proxmox/install.sh`
+- `compose.yml`
+- `.env.example`
+
+## Windows PowerShell
 
 ```powershell
-$Source = "C:\Temp\mail-attachment-hub-proxmox-installer-fixed"
+$Source = "C:\Temp\mail-attachment-hub-lxc-installer-complete-fix"
 $Repo   = "C:\Git\mail-attachment"
 
 Get-ChildItem $Source -Force |
-    Where-Object { $_.Name -ne "APPLY.md" } |
-    Copy-Item -Destination $Repo -Recurse -Force
+  Where-Object { $_.Name -ne "APPLY.md" } |
+  Copy-Item -Destination $Repo -Recurse -Force
 
 Set-Location $Repo
-git status
-```
-
-## Commit
-
-```powershell
-git add proxmox/install.sh docs/PROXMOX_INSTALLATION.md
-git commit -m "fix(installer): correct Proxmox template selection"
+git add proxmox/install.sh compose.yml .env.example
+git commit -m "fix(installer): make LXC installation complete reliably"
 git push origin main
 ```
 
-## Ta bort den misslyckade containern
+## Verify GitHub file
 
-Kör på Proxmox:
+```bash
+curl -fsSL "https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh?$(date +%s)" |
+  grep "Kontroll %02d/90"
+```
+
+## Clean installation
 
 ```bash
 pct stop 134 2>/dev/null || true
 pct destroy 134 --purge 2>/dev/null || true
-```
 
-## Installera igen
-
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh)"
+bash -c "$(curl -fsSL "https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh?$(date +%s)")"
 ```
