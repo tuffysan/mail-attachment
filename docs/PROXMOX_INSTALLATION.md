@@ -1,62 +1,78 @@
 # Proxmox LXC installation
 
-## One-line installation
+## Installation med en rad
 
-Run as `root` on the Proxmox VE host:
+Kör som `root` på Proxmox-värden:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh)"
 ```
 
-The installer:
+Installationsscriptet:
 
-1. validates Proxmox tools and storage;
-2. downloads the latest Debian 12 standard template;
-3. creates an unprivileged LXC with nesting and keyctl;
-4. installs Docker Engine and Docker Compose;
-5. clones `tuffysan/mail-attachment`;
-6. generates database, encryption and administrator secrets;
-7. builds and starts the complete stack;
-8. waits for `/health/ready`;
-9. installs the `mailhub` administration command;
-10. prints the URL and generated administrator password.
+1. verifierar Proxmox-kommandon och storage;
+2. väljer nästa lediga LXC-ID;
+3. hämtar senaste Debian 12-template;
+4. skapar en unprivilegierad LXC;
+5. aktiverar Docker-kompatibla LXC-inställningar;
+6. installerar Docker och Docker Compose;
+7. klonar Mail Attachment Hub;
+8. genererar säkra hemligheter och adminlösenord;
+9. bygger och startar tjänsterna;
+10. väntar på `/health/ready`;
+11. installerar administrationskommandot `mailhub`;
+12. visar URL och inloggningsuppgifter.
 
-## Default resources
+## Standardresurser
 
-- 2 CPU cores
+- 2 CPU-kärnor
 - 4096 MB RAM
 - 512 MB swap
 - 24 GB disk
-- DHCP on `vmbr0`
-- storage `local-lvm`
-- template storage `local`
+- DHCP på `vmbr0`
+- applikationsstorage `local-lvm`
+- template-storage `local`
 
-## Custom installation
-
-```bash
-CTID=134     STORAGE=local-lvm     TEMPLATE_STORAGE=local     BRIDGE=vmbr0     DISK_GB=40     MEMORY_MB=6144     CORES=4     ADMIN_EMAIL=admin@example.com     TZ=Europe/Stockholm     bash -c "$(curl -fsSL https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh)"
-```
-
-Static IP example:
+## Anpassad installation
 
 ```bash
-IPV4=192.168.1.50/24     GATEWAY=192.168.1.1     DNS_SERVER=192.168.1.1     bash -c "$(curl -fsSL https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh)"
+CTID=134 MEMORY_MB=6144 CORES=4 DISK_GB=40 ADMIN_EMAIL=admin@example.com TZ=Europe/Stockholm bash -c "$(curl -fsSL https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh)"
 ```
 
-## Administration
+## Statisk IP
 
-Enter the container:
+```bash
+IPV4=192.168.1.50/24 GATEWAY=192.168.1.1 DNS_SERVER=192.168.1.1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh)"
+```
+
+## Annan storage
+
+Kontrollera först:
+
+```bash
+pvesm status
+```
+
+Ange sedan storage:
+
+```bash
+STORAGE=local-lvm TEMPLATE_STORAGE=local bash -c "$(curl -fsSL https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh)"
+```
+
+## Efter installation
 
 ```bash
 pct enter <CTID>
 ```
 
-Available commands:
+Tillgängliga kommandon:
 
 ```bash
 mailhub status
 mailhub logs
 mailhub restart
+mailhub stop
+mailhub start
 mailhub update
 mailhub backup
 mailhub restore <backup-directory>
@@ -64,26 +80,41 @@ mailhub doctor
 mailhub credentials
 ```
 
-## Credentials
-
-Generated credentials are stored only inside the container:
+Adminuppgifterna finns i:
 
 ```text
 /root/mailhub-credentials.txt
 ```
 
-The application's full environment is stored in:
+Applikationen finns i:
 
 ```text
-/opt/mail-attachment-hub/.env
+/opt/mail-attachment-hub
 ```
 
-Both files should be protected and included in secure backups.
+## Felet "can't find file local:vztmpl"
 
-## Important
+Installeraren skriver loggmeddelanden till stderr. Därför innehåller
+templatevariabeln endast det riktiga templatefilnamnet och inte loggtext.
 
-Docker in LXC requires nesting. The script also applies LXC settings commonly
-needed for Docker in an unprivileged container. Review these settings against
-your own security requirements before exposing the service publicly.
+Exempel på korrekt templatevärde:
 
-Test backup and restore before production use.
+```text
+debian-12-standard_12.12-1_amd64.tar.zst
+```
+
+## Thin pool-varning
+
+Varningen:
+
+```text
+Sum of all thin volume sizes exceeds the size of thin pool
+```
+
+betyder att thin-poolen är överallokerad. Installationen kan fortsätta om
+det finns verkligt ledigt utrymme, men kontrollera:
+
+```bash
+pvesm status
+lvs
+```

@@ -1,40 +1,38 @@
-# Apply Operations Dashboard
+# Lägg in den korrigerade Proxmox-installern
 
-This is an overlay package. Copy it over the repository without deleting
-existing files or `.git`.
-
-## Windows PowerShell
+## Kopiera filerna
 
 ```powershell
-$Source = "C:\Temp\mail-attachment-hub-operations-dashboard"
+$Source = "C:\Temp\mail-attachment-hub-proxmox-installer-fixed"
 $Repo   = "C:\Git\mail-attachment"
 
 Get-ChildItem $Source -Force |
-  Where-Object { $_.Name -ne "APPLY.md" } |
-  Copy-Item -Destination $Repo -Recurse -Force
+    Where-Object { $_.Name -ne "APPLY.md" } |
+    Copy-Item -Destination $Repo -Recurse -Force
 
 Set-Location $Repo
 git status
 ```
 
-## Test
-
-```powershell
-docker compose --env-file .env -f compose.yml build backend frontend
-
-docker compose --env-file .env -f compose.yml run --rm --no-deps `
-  --entrypoint sh backend `
-  -c "pip install --no-cache-dir '.[test]' >/dev/null && pytest"
-
-docker compose --env-file .env -f compose.yml up -d --build
-```
-
-Open `/admin` after signing in as an administrator.
-
 ## Commit
 
 ```powershell
-git add -A
-git commit -m "feat(operations): add administration dashboard"
+git add proxmox/install.sh docs/PROXMOX_INSTALLATION.md
+git commit -m "fix(installer): correct Proxmox template selection"
 git push origin main
+```
+
+## Ta bort den misslyckade containern
+
+Kör på Proxmox:
+
+```bash
+pct stop 134 2>/dev/null || true
+pct destroy 134 --purge 2>/dev/null || true
+```
+
+## Installera igen
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh)"
 ```
