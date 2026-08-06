@@ -1,16 +1,15 @@
-# Apply Commit 001
+# Apply Commit 002A
 
-This ZIP contains complete replacement and new files for:
+Commit message:
 
-`feat(core): redesign configuration system`
+`feat(core): add structured logging and request middleware`
+
+This is an overlay package. Do not delete the repository and do not delete `.git`.
 
 ## Windows PowerShell
 
-Extract this ZIP. From the extracted directory, copy its contents over your
-cloned repository while preserving the repository's `.git` directory:
-
 ```powershell
-$Source = "C:\Temp\mail-attachment-hub-commit-001-config"
+$Source = "C:\Temp\mail-attachment-hub-commit-002A-observability"
 $Repo   = "C:\Git\mail-attachment"
 
 Get-ChildItem $Source -Force |
@@ -21,24 +20,36 @@ Set-Location $Repo
 git status
 ```
 
-Then test and commit:
+## Validate
 
 ```powershell
 docker compose --env-file .env -f compose.yml build backend
+
 docker compose --env-file .env -f compose.yml run --rm --no-deps `
   --entrypoint sh backend `
   -c "pip install --no-cache-dir '.[test]' >/dev/null && pytest"
-
-git add backend/src/mailhub/config.py `
-        backend/src/mailhub/core `
-        backend/tests/test_settings.py `
-        docs/CONFIGURATION.md
-
-git commit -m "feat(core): redesign configuration system"
-git push origin main
 ```
 
-## Important
+Then run the stack and verify headers:
 
-This is an overlay package. Do not delete other repository files and do not
-delete `.git`.
+```powershell
+docker compose --env-file .env -f compose.yml up -d --build
+Invoke-WebRequest http://127.0.0.1:8080/health/live | Select-Object -ExpandProperty Headers
+```
+
+## Commit
+
+```powershell
+git add .env.example compose.yml `
+  backend/src/mailhub/core/config/settings.py `
+  backend/src/mailhub/core/middleware `
+  backend/src/mailhub/core/observability `
+  backend/src/mailhub/logging_config.py `
+  backend/src/mailhub/main.py `
+  backend/tests/test_middleware.py `
+  backend/tests/test_observability.py `
+  docs/OBSERVABILITY.md
+
+git commit -m "feat(core): add structured logging and request middleware"
+git push origin main
+```

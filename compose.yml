@@ -57,6 +57,11 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      REQUEST_ID_HEADER: ${REQUEST_ID_HEADER:-X-Request-ID}
+      CORRELATION_ID_HEADER: ${CORRELATION_ID_HEADER:-X-Correlation-ID}
+      SECURITY_HEADERS_ENABLED: ${SECURITY_HEADERS_ENABLED:-true}
+      REQUEST_LOG_EXCLUDED_PATHS: ${REQUEST_LOG_EXCLUDED_PATHS:-/health/live,/health/ready}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mailhub}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mailhub}
       REDIS_URL: redis://redis:6379/0
       READINESS_TIMEOUT_SECONDS: ${READINESS_TIMEOUT_SECONDS:-2}
@@ -116,6 +121,11 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      REQUEST_ID_HEADER: ${REQUEST_ID_HEADER:-X-Request-ID}
+      CORRELATION_ID_HEADER: ${CORRELATION_ID_HEADER:-X-Correlation-ID}
+      SECURITY_HEADERS_ENABLED: ${SECURITY_HEADERS_ENABLED:-true}
+      REQUEST_LOG_EXCLUDED_PATHS: ${REQUEST_LOG_EXCLUDED_PATHS:-/health/live,/health/ready}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mailhub}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mailhub}
       REDIS_URL: redis://redis:6379/0
       APP_SECRET_KEY: ${APP_SECRET_KEY}

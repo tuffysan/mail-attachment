@@ -5,8 +5,8 @@ from mailhub.core.config import Settings
 
 
 BASE_ENV = {
-    "APP_SECRET_KEY": "x" * 32,
-    "ADMIN_PASSWORD": "a-secure-password",
+    "app_secret_key": "x" * 32,
+    "admin_password": "a-secure-password",
 }
 
 
@@ -17,9 +17,9 @@ def settings(**overrides: str) -> Settings:
 
 def test_email_engine_settings_are_part_of_settings_model() -> None:
     config = settings(
-        SYNC_INTERVAL_SECONDS="600",
-        SYNC_BATCH_SIZE="250",
-        STORAGE_RETRY_ATTEMPTS="5",
+        sync_interval_seconds="600",
+        sync_batch_size="250",
+        storage_retry_attempts="5",
     )
 
     assert config.sync_interval_seconds == 600
@@ -31,10 +31,10 @@ def test_email_engine_settings_are_part_of_settings_model() -> None:
 
 def test_empty_oauth_values_are_normalized_to_none() -> None:
     config = settings(
-        GOOGLE_CLIENT_ID="",
-        GOOGLE_CLIENT_SECRET="",
-        MICROSOFT_CLIENT_ID="",
-        MICROSOFT_CLIENT_SECRET="",
+        google_client_id="",
+        google_client_secret="",
+        microsoft_client_id="",
+        microsoft_client_secret="",
     )
 
     assert config.google_client_id is None
@@ -43,34 +43,34 @@ def test_empty_oauth_values_are_normalized_to_none() -> None:
 
 def test_partial_google_oauth_configuration_is_rejected() -> None:
     with pytest.raises(ValidationError, match="must be configured together"):
-        settings(GOOGLE_CLIENT_ID="client-only")
+        settings(google_client_id="client-only")
 
 
 def test_invalid_redis_url_is_rejected() -> None:
-    with pytest.raises(ValidationError, match="REDIS_URL"):
-        settings(REDIS_URL="http://redis:6379")
+    with pytest.raises(ValidationError, match="redis_url"):
+        settings(redis_url="http://redis:6379")
 
 
 def test_invalid_log_level_is_rejected() -> None:
-    with pytest.raises(ValidationError, match="LOG_LEVEL"):
-        settings(LOG_LEVEL="verbose")
+    with pytest.raises(ValidationError, match="log_level"):
+        settings(log_level="verbose")
 
 
 def test_production_placeholder_secret_is_rejected() -> None:
     with pytest.raises(ValidationError, match="placeholder"):
         Settings(
             _env_file=None,
-            APP_ENV="production",
-            APP_SECRET_KEY="replace-with-at-least-32-random-characters",
-            ADMIN_PASSWORD="a-secure-password",
+            app_env="production",
+            app_secret_key="replace-with-at-least-32-random-characters",
+            admin_password="a-secure-password",
         )
 
 
 def test_grouped_views_preserve_flat_values() -> None:
     config = settings(
-        DATABASE_POOL_SIZE="8",
-        ACCESS_TOKEN_EXPIRE_MINUTES="90",
-        ATTACHMENT_DATA_DIR="/tmp/mailhub",
+        database_pool_size="8",
+        access_token_expire_minutes="90",
+        attachment_data_dir="/tmp/mailhub",
     )
 
     assert config.database.pool_size == config.database_pool_size == 8

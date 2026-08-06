@@ -15,8 +15,12 @@ class ApplicationConfig(BaseModel):
     name: str
     version: str
     log_level: str
+    log_format: str
     base_url: str
     readiness_timeout_seconds: float
+    request_id_header: str
+    correlation_id_header: str
+    security_headers_enabled: bool
 
 
 class DatabaseConfig(BaseModel):
@@ -79,6 +83,11 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     app_base_url: str = "http://localhost:8080"
     log_level: str = "INFO"
+    log_format: Literal["json", "console"] = "json"
+    request_id_header: str = "X-Request-ID"
+    correlation_id_header: str = "X-Correlation-ID"
+    security_headers_enabled: bool = True
+    request_log_excluded_paths: str = "/health/live,/health/ready"
 
     database_url: str = Field(
         default="postgresql+asyncpg://mailhub:mailhub@postgres:5432/mailhub",
@@ -115,6 +124,14 @@ class Settings(BaseSettings):
     microsoft_tenant_id: str = "common"
 
     storage_retry_attempts: int = Field(default=3, ge=1, le=10)
+
+    @field_validator("request_id_header", "correlation_id_header")
+    @classmethod
+    def validate_header_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized or any(char in normalized for char in "\r\n:"):
+            raise ValueError("Header names must be non-empty and cannot contain CR, LF or colon")
+        return normalized
 
     @field_validator("log_level")
     @classmethod
@@ -202,7 +219,11 @@ class Settings(BaseSettings):
             name=self.app_name,
             version=self.app_version,
             log_level=self.log_level,
+            log_format=self.log_format,
             base_url=self.app_base_url,
+            request_id_header=self.request_id_header,
+            correlation_id_header=self.correlation_id_header,
+            security_headers_enabled=self.security_headers_enabled,
             readiness_timeout_seconds=self.readiness_timeout_seconds,
         )
 

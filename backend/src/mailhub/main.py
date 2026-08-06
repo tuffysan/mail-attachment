@@ -15,10 +15,11 @@ from mailhub.auth.bootstrap import ensure_bootstrap_admin
 from mailhub.config import get_settings
 from mailhub.db import close_database, initialize_database
 from mailhub.health import run_readiness_checks
+from mailhub.core.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from mailhub.logging_config import configure_logging
 
 settings = get_settings()
-configure_logging(settings.log_level)
+configure_logging(settings.log_level, settings.log_format)
 logger = logging.getLogger(__name__)
 
 
@@ -40,6 +41,22 @@ app = FastAPI(
     docs_url="/docs" if settings.app_env != "production" else None,
     redoc_url=None,
     lifespan=lifespan,
+)
+
+excluded_paths = {
+    path.strip()
+    for path in settings.request_log_excluded_paths.split(",")
+    if path.strip()
+}
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    enabled=settings.security_headers_enabled,
+)
+app.add_middleware(
+    RequestContextMiddleware,
+    request_id_header=settings.request_id_header,
+    correlation_id_header=settings.correlation_id_header,
+    excluded_paths=excluded_paths,
 )
 
 
