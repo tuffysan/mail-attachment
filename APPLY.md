@@ -1,18 +1,11 @@
-# Apply Commit 002B
+# Apply Proxmox installer overlay
 
-Commit message:
+This package adds a complete one-line Proxmox LXC installer.
 
-```text
-feat(core): add centralized API error handling
-```
-
-This is an overlay package. Copy it over the repository without deleting
-existing files or the `.git` directory.
-
-## Windows PowerShell
+## Copy files
 
 ```powershell
-$Source = "C:\Temp\mail-attachment-hub-commit-002B-errors"
+$Source = "C:\Temp\mail-attachment-hub-proxmox-installer"
 $Repo   = "C:\Git\mail-attachment"
 
 Get-ChildItem $Source -Force |
@@ -23,20 +16,18 @@ Set-Location $Repo
 git status
 ```
 
-## Test
-
-```powershell
-docker compose --env-file .env -f compose.yml build backend
-
-docker compose --env-file .env -f compose.yml run --rm --no-deps `
-  --entrypoint sh backend `
-  -c "pip install --no-cache-dir '.[test]' >/dev/null && pytest"
-```
-
 ## Commit
 
 ```powershell
-git add -A
-git commit -m "feat(core): add centralized API error handling"
+git add proxmox docs/PROXMOX_INSTALLATION.md
+git commit -m "feat(installer): add one-line Proxmox LXC appliance"
 git push origin main
+```
+
+## Install after pushing
+
+Run on the Proxmox host:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh)"
 ```

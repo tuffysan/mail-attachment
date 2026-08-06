@@ -18,6 +18,7 @@ class ApplicationConfig(BaseModel):
     log_format: str
     base_url: str
     readiness_timeout_seconds: float
+    shutdown_timeout_seconds: float
     request_id_header: str
     correlation_id_header: str
     security_headers_enabled: bool
@@ -98,6 +99,7 @@ class Settings(BaseSettings):
 
     redis_url: str = Field(default="redis://redis:6379/0", repr=False)
     readiness_timeout_seconds: float = Field(default=2.0, ge=0.1, le=30.0)
+    shutdown_timeout_seconds: float = Field(default=30.0, ge=1.0, le=300.0)
 
     app_secret_key: str = Field(min_length=32, repr=False)
     jwt_algorithm: str = "HS256"

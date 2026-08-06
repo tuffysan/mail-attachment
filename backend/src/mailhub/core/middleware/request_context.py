@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from mailhub.core.metrics import metrics_registry
 from mailhub.core.observability.context import correlation_id_var, request_id_var
 
 logger = logging.getLogger("mailhub.http")
@@ -21,7 +22,7 @@ def _header(scope: Scope, name: str) -> str | None:
 
 
 class RequestContextMiddleware:
-    """Create request context, response headers and one structured access log."""
+    """Create request context, response headers, metrics and access logs."""
 
     def __init__(
         self,
@@ -57,8 +58,14 @@ class RequestContextMiddleware:
                 headers = list(message.get("headers", []))
                 headers.extend(
                     [
-                        (self.request_id_header.encode("latin-1"), request_id.encode("latin-1")),
-                        (self.correlation_id_header.encode("latin-1"), correlation_id.encode("latin-1")),
+                        (
+                            self.request_id_header.encode("latin-1"),
+                            request_id.encode("latin-1"),
+                        ),
+                        (
+                            self.correlation_id_header.encode("latin-1"),
+                            correlation_id.encode("latin-1"),
+                        ),
                     ]
                 )
                 message["headers"] = headers
@@ -67,17 +74,24 @@ class RequestContextMiddleware:
         try:
             await self.app(scope, receive, send_with_headers)
         finally:
-            duration_ms = round((time.perf_counter() - started) * 1000, 2)
-            path = scope.get("path", "")
-            if path not in self.excluded_paths:
+            duration_seconds = time.perf_counter() - started
+            path = scope.get("route", {}).path if hasattr(scope.get("route"), "path") else scope.get("path", "")
+            method = scope.get("method", "UNKNOWN")
+            metrics_registry.observe_request(
+                method=method,
+                path=path,
+                status_code=status_code,
+                duration_seconds=duration_seconds,
+            )
+            if scope.get("path", "") not in self.excluded_paths:
                 client = scope.get("client")
                 logger.info(
                     "http_request_completed",
                     extra={
-                        "http_method": scope.get("method"),
-                        "http_path": path,
+                        "http_method": method,
+                        "http_path": scope.get("path", ""),
                         "http_status": status_code,
-                        "duration_ms": duration_ms,
+                        "duration_ms": round(duration_seconds * 1000, 2),
                         "client_ip": client[0] if client else None,
                     },
                 )
