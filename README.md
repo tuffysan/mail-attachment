@@ -4,7 +4,7 @@ Mail Attachment Hub is an open-source service for collecting email attachments a
 
 ## Current delivery
 
-**Sprint 0 · Step 004 — asynchronous database layer and Alembic migrations**
+**Sprint 0 · Step 005 — asynchronous database layer and Alembic migrations**
 
 The repository currently provides:
 

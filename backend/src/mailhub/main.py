@@ -5,6 +5,8 @@ from typing import Any
 from fastapi import FastAPI, Response, status
 
 from mailhub import __version__
+from mailhub.api.auth import router as auth_router
+from mailhub.auth.bootstrap import ensure_bootstrap_admin
 from mailhub.config import get_settings
 from mailhub.db import close_database, initialize_database
 from mailhub.health import run_readiness_checks
@@ -18,6 +20,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     initialize_database(settings)
+    await ensure_bootstrap_admin(settings)
     logger.info("application_started")
     try:
         yield
@@ -66,3 +69,6 @@ async def readiness(response: Response) -> dict[str, Any]:
             for check in checks
         },
     }
+
+
+app.include_router(auth_router)

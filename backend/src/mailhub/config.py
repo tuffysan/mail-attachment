@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     app_name: str = "Mail Attachment Hub"
-    app_version: str = "0.4.0"
+    app_version: str = "0.5.0"
     log_level: str = "INFO"
     database_url: str = Field(
         default="postgresql+asyncpg://mailhub:mailhub@postgres:5432/mailhub",
@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     database_pool_size: int = 5
     database_max_overflow: int = 10
     readiness_timeout_seconds: float = 2.0
+    app_secret_key: str = Field(min_length=32, repr=False)
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60
+    admin_email: str | None = None
+    admin_password: str | None = Field(default=None, min_length=12, repr=False)
+    admin_display_name: str = "Administrator"
 
 
 @lru_cache

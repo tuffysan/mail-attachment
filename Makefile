@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
-.PHONY: help init check config build test up down restart ps logs wait api-smoke migrate migration-smoke migration-cycle clean reset
+.PHONY: help init check config build test up down restart ps logs wait api-smoke migrate migration-smoke migration-cycle auth-smoke clean reset
 
 help:
 	@printf '%s\n' \
@@ -18,6 +18,7 @@ help:
 	  '  make migrate    Apply all database migrations' \
 	  '  make migration-smoke Verify current schema revision' \
 	  '  make migration-cycle Test downgrade and upgrade' \
+	  '  make auth-smoke Verify admin login and protected endpoint' \
 	  '  make ps         Show service status' \
 	  '  make logs       Follow service logs' \
 	  '  make down       Stop services' \
@@ -63,6 +64,9 @@ migration-smoke:
 
 migration-cycle:
 	@./scripts/migration-cycle.sh
+
+auth-smoke:
+	@./scripts/auth-smoke.sh
 
 down:
 	@docker compose --env-file .env -f compose.yml down
