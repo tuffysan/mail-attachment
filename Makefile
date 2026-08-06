@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
-.PHONY: help init check config build test up down restart ps logs wait api-smoke migrate migration-smoke migration-cycle auth-smoke clean reset
+.PHONY: help init check config build test frontend-build up down restart ps logs wait api-smoke frontend-smoke migrate migration-smoke migration-cycle auth-smoke clean reset
 
 help:
 	@printf '%s\n' \
@@ -10,7 +10,7 @@ help:
 	  '  make init       Create .env with generated secrets' \
 	  '  make check      Run static repository checks' \
 	  '  make config     Render and validate Docker Compose config' \
-	  '  make build      Build the backend image' \
+	  '  make build      Build backend and frontend images' \
 	  '  make test       Run backend tests in Docker' \
 	  '  make up         Start backend, PostgreSQL and Redis' \
 	  '  make wait       Wait until all services are healthy' \
@@ -19,6 +19,7 @@ help:
 	  '  make migration-smoke Verify current schema revision' \
 	  '  make migration-cycle Test downgrade and upgrade' \
 	  '  make auth-smoke Verify admin login and protected endpoint' \
+	  '  make frontend-smoke Verify the web UI and reverse proxy' \
 	  '  make ps         Show service status' \
 	  '  make logs       Follow service logs' \
 	  '  make down       Stop services' \
@@ -34,13 +35,17 @@ check:
 	@./tests/compose-static-check.sh
 	@./tests/backend-static-check.sh
 	@./tests/migration-static-check.sh
+	@./tests/frontend-static-check.sh
 
 config:
 	@./scripts/require-env.sh
 	@docker compose --env-file .env -f compose.yml config --quiet
 
 build: config
-	@docker compose --env-file .env -f compose.yml build backend
+	@docker compose --env-file .env -f compose.yml build backend frontend
+
+frontend-build: config
+	@docker compose --env-file .env -f compose.yml build frontend
 
 test: build
 	@docker compose --env-file .env -f compose.yml run --rm --no-deps \
@@ -67,6 +72,9 @@ migration-cycle:
 
 auth-smoke:
 	@./scripts/auth-smoke.sh
+
+frontend-smoke:
+	@./scripts/frontend-smoke.sh
 
 down:
 	@docker compose --env-file .env -f compose.yml down

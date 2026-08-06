@@ -1,32 +1,30 @@
 # Mail Attachment Hub
 
-Mail Attachment Hub is an open-source service for collecting email attachments and routing them to configured storage destinations. The project is being built incrementally, with every step remaining runnable and reviewable.
+Mail Attachment Hub is an open-source service for collecting email attachments and routing them to configured storage destinations. The project is built incrementally, with every step remaining runnable and reviewable.
 
 ## Current delivery
 
-**Sprint 0 · Step 005 — asynchronous database layer and Alembic migrations**
+**Sprint 0 · Step 006 — React login and dashboard**
 
 The repository currently provides:
 
-- FastAPI backend in a dedicated Docker image
-- PostgreSQL 16 and Redis 7
-- SQLAlchemy 2 asynchronous engine and sessions
-- Alembic schema migrations
-- initial `system_metadata` table
-- automatic migration on backend startup
-- JSON logging
-- liveness and dependency-aware readiness endpoints
-- Docker Compose healthchecks
-- backend unit tests and migration integration tests
-- GitHub Actions CI for `main` and `master`
+- React 19 + TypeScript web interface
+- responsive login page and protected dashboard
+- FastAPI backend and JWT authentication
+- administrator bootstrap on first start
+- PostgreSQL 16, Redis 7 and SQLAlchemy 2
+- Alembic migrations
+- Nginx reverse proxy between the browser and backend
+- JSON logging and dependency-aware health checks
+- backend tests plus full-stack smoke checks in GitHub Actions
 
-Email accounts, attachment rules, OAuth, storage integrations, workers, frontend and Proxmox installation intentionally arrive in later steps.
+Email accounts, attachment rules, OAuth, storage integrations, workers and Proxmox installation intentionally arrive in later steps.
 
 ## Requirements
 
 - Git
 - Docker Engine with Docker Compose v2
-- GNU Make and Bash for the documented convenience commands
+- GNU Make and Bash for convenience commands
 
 Windows users can run the commands through WSL 2 or Git Bash, or invoke Docker Compose directly.
 
@@ -39,33 +37,13 @@ make test
 make up
 make api-smoke
 make migration-smoke
+make auth-smoke
+make frontend-smoke
 ```
 
-The API is then available at:
+The web interface is available at `http://127.0.0.1:3000`.
+The API and Swagger documentation are available at `http://127.0.0.1:8080/docs` in development mode.
 
-- `http://127.0.0.1:8080/`
-- `http://127.0.0.1:8080/health/live`
-- `http://127.0.0.1:8080/health/ready`
-- `http://127.0.0.1:8080/docs`
+`make init` writes generated administrator credentials to the local `.env` file. Do not commit `.env`.
 
-## Database migrations
-
-```bash
-make migrate
-make migration-smoke
-make migration-cycle
-```
-
-`make migration-cycle` temporarily downgrades the development database to the empty base revision and upgrades it back to the latest revision. Do not run that command against a production database.
-
-## Common commands
-
-```bash
-make help
-make ps
-make logs
-make down
-make reset
-```
-
-Read [STEP.md](STEP.md) for the exact scope and acceptance criteria of this delivery.
+Read [STEP.md](STEP.md) for the scope and acceptance criteria of this delivery.

@@ -31,6 +31,8 @@ jobs:
         run: make migration-cycle
       - name: Verify authentication
         run: make auth-smoke
+      - name: Verify frontend
+        run: make frontend-smoke
       - name: Show status
         run: make ps
       - name: Show logs on failure
