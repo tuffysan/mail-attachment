@@ -254,7 +254,8 @@ install_application() {
         jq \
         locales \
         make \
-        openssl
+        openssl \
+        iproute2
 
       locale-gen C.UTF-8 >/dev/null 2>&1 || true
 
@@ -316,6 +317,10 @@ install_application() {
         replace_env ADMIN_EMAIL "$ADMIN_EMAIL"
         replace_env ADMIN_PASSWORD "$ADMIN_PASSWORD"
         replace_env TZ "$TZ"
+        replace_env FRONTEND_BIND_ADDRESS "0.0.0.0"
+        replace_env BACKEND_BIND_ADDRESS "0.0.0.0"
+        replace_env FRONTEND_PORT "$WEB_PORT"
+        replace_env BACKEND_PORT "$API_PORT"
 
         cat > /root/mailhub-credentials.txt <<EOF
 MAIL_ATTACHMENT_HUB_CREDENTIALS_VERSION=1
@@ -327,6 +332,22 @@ EOF
 
         chmod 600 /root/mailhub-credentials.txt
       fi
+
+      replace_env() {
+        local key="$1"
+        local value="$2"
+
+        if grep -q "^${key}=" .env; then
+          sed -i "s|^${key}=.*|${key}=${value}|" .env
+        else
+          printf "%s=%s\n" "$key" "$value" >> .env
+        fi
+      }
+
+      replace_env FRONTEND_BIND_ADDRESS "0.0.0.0"
+      replace_env BACKEND_BIND_ADDRESS "0.0.0.0"
+      replace_env FRONTEND_PORT "$WEB_PORT"
+      replace_env BACKEND_PORT "$API_PORT"
 
       docker compose \
         --env-file .env \
@@ -356,6 +377,13 @@ EOF
       curl -fsS \
         "http://127.0.0.1:${API_PORT}/health/ready" \
         >/dev/null
+
+      curl -fsS \
+        "http://127.0.0.1:${WEB_PORT}" \
+        >/dev/null
+
+      ss -lnt | grep -q "0.0.0.0:${WEB_PORT}"
+      ss -lnt | grep -q "0.0.0.0:${API_PORT}"
 
       cat > /usr/local/bin/mailhub <<'"'"'EOF'"'"'
 #!/usr/bin/env bash
