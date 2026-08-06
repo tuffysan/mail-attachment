@@ -6,6 +6,7 @@ from fastapi import FastAPI, Response, status
 
 from mailhub import __version__
 from mailhub.config import get_settings
+from mailhub.db import close_database, initialize_database
 from mailhub.health import run_readiness_checks
 from mailhub.logging_config import configure_logging
 
@@ -16,9 +17,13 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    initialize_database(settings)
     logger.info("application_started")
-    yield
-    logger.info("application_stopped")
+    try:
+        yield
+    finally:
+        await close_database()
+        logger.info("application_stopped")
 
 
 app = FastAPI(

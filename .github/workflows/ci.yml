@@ -21,12 +21,19 @@ jobs:
         run: make config
       - name: Run backend tests
         run: make test
-      - name: Start stack
+      - name: Start stack and apply migrations
         run: make up
       - name: Verify health API
         run: make api-smoke
+      - name: Verify database schema
+        run: make migration-smoke
+      - name: Test migration downgrade and upgrade
+        run: make migration-cycle
       - name: Show status
         run: make ps
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose --env-file .env -f compose.yml logs --no-color
       - name: Stop stack
         if: always()
         run: docker compose --env-file .env -f compose.yml down --volumes

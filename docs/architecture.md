@@ -1,15 +1,14 @@
 # Architecture
 
-## Sprint 0 baseline
+## Current Sprint 0 architecture
 
-Mail Attachment Hub will use independently deployable services:
+- **FastAPI backend:** HTTP API, health probes and lifecycle management.
+- **PostgreSQL 16:** durable relational database.
+- **SQLAlchemy 2 async:** application database access and transaction sessions.
+- **Alembic:** ordered, reviewable and reversible database schema migrations.
+- **Redis 7:** future job queue and short-lived coordination data.
+- **Docker Compose:** local and CI runtime orchestration.
 
-- `api`: FastAPI application, added in Step 003
-- `web`: React application, added in Step 005
-- `worker`: background jobs, added in a later sprint
-- `postgres`: durable relational data
-- `redis`: queues, locks and short-lived state
+The backend applies pending migrations before starting Uvicorn. Readiness checks use the shared SQLAlchemy engine and Redis client. Application code obtains one asynchronous SQLAlchemy session per request through a FastAPI dependency.
 
-Only PostgreSQL and Redis are introduced in Step 002. Both run on an internal Docker network. Development ports bind to loopback only.
-
-Persistent data is stored in named Docker volumes. Application services will connect by Compose DNS names (`postgres` and `redis`) rather than host ports.
+Future steps will introduce authentication, the frontend, email connectors, rule execution, storage adapters and background workers without replacing this database foundation.

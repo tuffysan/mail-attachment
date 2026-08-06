@@ -1,28 +1,29 @@
-# Sprint 0 · Step 003
+# Sprint 0 · Step 004
 
 ## Goal
 
-Introduce a small but production-shaped FastAPI backend that can prove the application process and its infrastructure dependencies are healthy.
+Add a production-shaped asynchronous database layer and versioned PostgreSQL schema migrations to the FastAPI backend.
 
 ## Included
 
-- FastAPI Docker image
-- typed environment configuration
-- JSON container logging
-- liveness endpoint
-- PostgreSQL and Redis readiness checks
-- backend unit tests
-- Docker Compose backend service
-- CI build, test, startup and smoke test
+- SQLAlchemy 2 asynchronous engine and sessions
+- deterministic database constraint naming
+- Alembic asynchronous migration environment
+- initial `system_metadata` table
+- automatic `alembic upgrade head` before backend startup
+- migration smoke test
+- downgrade/upgrade migration-cycle test
+- database model unit tests
+- CI verification of the current schema revision
 
 ## Not included yet
 
-- database schema or migrations
-- users or authentication
+- application users or authentication
 - frontend
 - email accounts
 - attachment rules
 - storage integrations
+- background job workers
 - Proxmox installation
 
 ## Acceptance criteria
@@ -33,6 +34,8 @@ make check
 make test
 make up
 make api-smoke
+make migration-smoke
+make migration-cycle
 ```
 
-All commands must complete successfully from a clean checkout with Docker available.
+All commands must complete successfully from a clean checkout with Docker available. After startup, PostgreSQL must report Alembic revision `0001` and the `system_metadata` table must exist.

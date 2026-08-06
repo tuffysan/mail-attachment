@@ -1,10 +1,11 @@
 import asyncio
 from dataclasses import dataclass
 
-import asyncpg
 import redis.asyncio as redis
+from sqlalchemy import text
 
 from mailhub.config import Settings
+from mailhub.db.session import get_engine
 
 
 @dataclass(frozen=True)
@@ -15,24 +16,15 @@ class ProbeResult:
 
 
 async def check_postgres(settings: Settings) -> ProbeResult:
-    connection: asyncpg.Connection | None = None
     try:
-        connection = await asyncio.wait_for(
-            asyncpg.connect(settings.database_url),
-            timeout=settings.readiness_timeout_seconds,
-        )
-        value = await asyncio.wait_for(
-            connection.fetchval("SELECT 1"),
-            timeout=settings.readiness_timeout_seconds,
-        )
+        async with asyncio.timeout(settings.readiness_timeout_seconds):
+            async with get_engine().connect() as connection:
+                value = await connection.scalar(text("SELECT 1"))
         if value != 1:
             return ProbeResult("postgres", False, "unexpected query result")
         return ProbeResult("postgres", True, "ok")
     except Exception as exc:  # health endpoint must return a result, not crash
         return ProbeResult("postgres", False, type(exc).__name__)
-    finally:
-        if connection is not None:
-            await connection.close()
 
 
 async def check_redis(settings: Settings) -> ProbeResult:

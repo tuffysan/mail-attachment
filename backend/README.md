@@ -1,21 +1,44 @@
 # Backend
 
-FastAPI backend introduced in Sprint 0 · Step 003.
+FastAPI backend for Mail Attachment Hub.
 
-## Endpoints
+## Development
 
-- `GET /` — service metadata
-- `GET /health/live` — process liveness
-- `GET /health/ready` — PostgreSQL and Redis readiness
-
-## Local tests
+The backend runs in Docker and connects asynchronously to PostgreSQL and Redis.
 
 ```bash
-cd backend
-python -m venv .venv
-. .venv/bin/activate
-pip install -e '.[test]'
-pytest
+make init
+make test
+make up
+make api-smoke
+make migration-smoke
 ```
 
-The supported project workflow uses Docker Compose from the repository root.
+Swagger is available at `http://127.0.0.1:8080/docs` in development mode.
+
+## Database migrations
+
+Apply migrations:
+
+```bash
+make migrate
+```
+
+Verify the installed revision and first table:
+
+```bash
+make migration-smoke
+```
+
+Test a full downgrade and upgrade cycle:
+
+```bash
+make migration-cycle
+```
+
+Create future revisions from inside the backend container:
+
+```bash
+docker compose --env-file .env -f compose.yml exec backend \
+  alembic revision --autogenerate -m "describe change"
+```

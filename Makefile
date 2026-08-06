@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
-.PHONY: help init check config build test up down restart ps logs wait api-smoke clean reset
+.PHONY: help init check config build test up down restart ps logs wait api-smoke migrate migration-smoke migration-cycle clean reset
 
 help:
 	@printf '%s\n' \
@@ -15,6 +15,9 @@ help:
 	  '  make up         Start backend, PostgreSQL and Redis' \
 	  '  make wait       Wait until all services are healthy' \
 	  '  make api-smoke  Verify live and ready API endpoints' \
+	  '  make migrate    Apply all database migrations' \
+	  '  make migration-smoke Verify current schema revision' \
+	  '  make migration-cycle Test downgrade and upgrade' \
 	  '  make ps         Show service status' \
 	  '  make logs       Follow service logs' \
 	  '  make down       Stop services' \
@@ -29,6 +32,7 @@ check:
 	@./tests/env-check.sh .env.example
 	@./tests/compose-static-check.sh
 	@./tests/backend-static-check.sh
+	@./tests/migration-static-check.sh
 
 config:
 	@./scripts/require-env.sh
@@ -50,6 +54,15 @@ wait:
 
 api-smoke:
 	@./scripts/api-smoke.sh
+
+migrate:
+	@docker compose --env-file .env -f compose.yml exec -T backend alembic upgrade head
+
+migration-smoke:
+	@./scripts/migration-smoke.sh
+
+migration-cycle:
+	@./scripts/migration-cycle.sh
 
 down:
 	@docker compose --env-file .env -f compose.yml down

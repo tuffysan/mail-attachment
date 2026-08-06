@@ -1,14 +1,14 @@
 # Roadmap
 
-## Sprint 0 — Platform foundation
+## Sprint 0
 
-- [x] Step 001: repository policies and structure
-- [x] Step 002: PostgreSQL, Redis, environment bootstrap and CI runtime check
-- [ ] Step 003: FastAPI service with `/health/live` and `/health/ready`
-- [ ] Step 004: SQLAlchemy, Alembic and initial schema
-- [ ] Step 005: React/Vite frontend shell
-- [ ] Step 006: login and session foundation
-- [ ] Step 007: Proxmox LXC installer foundation
-- [ ] Step 008: end-to-end smoke test and Sprint 0 release
+- [x] Step 001 — repository foundation
+- [x] Step 002 — PostgreSQL and Redis infrastructure
+- [x] Step 003 — FastAPI backend and health API
+- [x] Step 004 — async SQLAlchemy database layer and Alembic
+- [ ] Step 005 — application configuration API and persistent instance settings
+- [ ] Step 006 — React frontend foundation
+- [ ] Step 007 — user authentication foundation
+- [ ] Step 008 — Proxmox installation foundation
 
-Later sprints add OAuth providers, email collection, storage integrations, rules, OCR, search, APIs and plugins.
+Later sprints add Gmail OAuth, storage providers, rules, workers, OCR, search, API integrations and enterprise capabilities.

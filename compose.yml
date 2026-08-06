@@ -57,9 +57,11 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-mailhub}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mailhub}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mailhub}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mailhub}
       REDIS_URL: redis://redis:6379/0
       READINESS_TIMEOUT_SECONDS: ${READINESS_TIMEOUT_SECONDS:-2}
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-5}
+      DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-10}
       TZ: ${TZ:-UTC}
     ports:
       - "${BACKEND_BIND_ADDRESS:-127.0.0.1}:${BACKEND_PORT:-8080}:8080"

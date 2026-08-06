@@ -10,14 +10,14 @@ def test_root_metadata() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["name"] == "Mail Attachment Hub"
-    assert payload["version"] == "0.3.0"
+    assert payload["version"] == "0.4.0"
 
 
 def test_liveness() -> None:
     with TestClient(app) as client:
         response = client.get("/health/live")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "version": "0.3.0"}
+    assert response.json() == {"status": "ok", "version": "0.4.0"}
 
 
 def test_readiness_healthy(monkeypatch) -> None:
