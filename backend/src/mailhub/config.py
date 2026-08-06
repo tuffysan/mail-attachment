@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     app_name: str = "Mail Attachment Hub"
-    app_version: str = "0.8.0"
+    app_version: str = "0.9.0"
     log_level: str = "INFO"
     database_url: str = Field(
         default="postgresql+asyncpg://mailhub:mailhub@postgres:5432/mailhub",

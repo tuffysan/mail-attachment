@@ -11,6 +11,7 @@ from mailhub.db.models import ActivityEvent, Attachment, EmailAccount, MailMessa
 from mailhub.mail.crypto import CredentialCipher
 from mailhub.mail.engine import ParsedAttachment, fetch_messages
 from mailhub.mail.oauth import refresh_access_token
+from mailhub.rules.router import route_attachment
 
 
 async def activity(session: AsyncSession, event_type: str, message: str, account_id=None, level="info", details=None):

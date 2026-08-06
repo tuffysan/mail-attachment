@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from mailhub.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -110,3 +110,63 @@ class ActivityEvent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     message: Mapped[str] = mapped_column(Text, nullable=False)
     details_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class StorageDestination(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "storage_destinations"
+
+    name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False, default="local", server_default="local")
+    base_path: Mapped[str] = mapped_column(Text, nullable=False, default="/data/routed", server_default="/data/routed")
+    encrypted_config: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+
+
+class AttachmentRule(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "attachment_rules"
+
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    email_account_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("email_accounts.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100, server_default="100")
+    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    stop_processing: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    sender_pattern: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recipient_pattern: Mapped[str | None] = mapped_column(Text, nullable=True)
+    subject_pattern: Mapped[str | None] = mapped_column(Text, nullable=True)
+    filename_pattern: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_type_pattern: Mapped[str | None] = mapped_column(Text, nullable=True)
+    min_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    folder_template: Mapped[str] = mapped_column(
+        Text, nullable=False, default="{year}/{month}/{sender}", server_default="{year}/{month}/{sender}"
+    )
+
+
+class RuleDestination(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "rule_destinations"
+
+    rule_id: Mapped[UUID] = mapped_column(
+        ForeignKey("attachment_rules.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    destination_id: Mapped[UUID] = mapped_column(
+        ForeignKey("storage_destinations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+
+class RuleExecution(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "rule_executions"
+
+    rule_id: Mapped[UUID] = mapped_column(
+        ForeignKey("attachment_rules.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    attachment_id: Mapped[UUID] = mapped_column(
+        ForeignKey("attachments.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    destination_id: Mapped[UUID] = mapped_column(
+        ForeignKey("storage_destinations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    target_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)

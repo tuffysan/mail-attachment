@@ -1,50 +1,49 @@
 # Mail Attachment Hub
 
-Mail Attachment Hub is an open-source service that securely collects email attachments and routes them to configured storage destinations.
+Mail Attachment Hub securely collects email attachments and routes them according to user-defined rules.
 
 ## Current delivery
-**Sprint 0 · Step 008 — complete email ingestion engine**
+
+**Sprint 0 · Step 009 — complete attachment rule engine**
 
 This snapshot includes:
-- FastAPI, React, PostgreSQL and Redis
-- local administrator login and JWT
-- encrypted multi-account IMAP configuration
-- Gmail and Microsoft 365 OAuth/XOAUTH2 foundations
-- scheduled worker and manual sync
-- UID-based incremental mailbox scanning
-- MIME and attachment extraction
-- bounded ZIP expansion
-- duplicate protection, retry runs and activity history
-- persistent attachment staging volume
-- Docker Compose and GitHub Actions tests
 
-Rules and external storage routing arrive in Steps 009–010.
+- FastAPI, React, PostgreSQL, Redis and scheduled worker
+- local admin login and JWT
+- multiple encrypted IMAP accounts
+- Gmail and Microsoft OAuth foundations
+- incremental mailbox sync and attachment extraction
+- duplicate protection and activity history
+- rule priorities and stop-processing behavior
+- filters for sender, recipient, subject, filename, content type and size
+- multiple destinations per rule
+- dynamic folder templates
+- rule simulation in the web interface
+- automatic routing to a persistent local destination
 
-## Start
+Remote storage providers are added in Step 010.
+
+## Start locally
+
 ```bash
 make init
 make check
 make test
 make up
-make mail-engine-smoke
+make rule-engine-smoke
 ```
 
 Open:
+
 - UI: `http://127.0.0.1:3000`
 - API docs: `http://127.0.0.1:8080/docs`
 
-## OAuth
-Add OAuth app credentials to `.env`:
-```env
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-MICROSOFT_CLIENT_ID=
-MICROSOFT_CLIENT_SECRET=
-MICROSOFT_TENANT_ID=common
-```
-Register callback URLs shown by the API host:
-- `/api/v1/oauth/google/callback`
-- `/api/v1/oauth/microsoft/callback`
+## Example rule
 
-## Data safety
-Passwords and OAuth tokens are encrypted with a key derived from `APP_SECRET_KEY`. Never change that secret after accounts have been configured unless credentials are re-entered.
+- Sender: `@supplier\.com$`
+- Subject: `invoice|faktura`
+- Filename: `\.pdf$`
+- Folder: `Invoices/{year}/{month}/{sender}`
+- Destination: `Local routed files`
+
+Bilagor kopieras till Docker-volymen `routed_data`.

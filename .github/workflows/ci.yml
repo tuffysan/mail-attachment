@@ -37,6 +37,8 @@ jobs:
         run: make email-account-smoke
       - name: Verify mail engine worker
         run: make mail-engine-smoke
+      - name: Verify rule engine
+        run: make rule-engine-smoke
       - name: Show status
         run: make ps
       - name: Show logs on failure

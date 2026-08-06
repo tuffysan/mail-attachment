@@ -1,28 +1,36 @@
-# Sprint 0 · Step 008
+# Sprint 0 · Step 009
 
 ## Goal
-Deliver the complete email ingestion engine as one coherent increment.
+
+Deliver a complete attachment rule engine with priorities, simulation, multiple destinations and automatic local routing.
 
 ## Included
-- password IMAP and XOAUTH2 authentication
-- Google Gmail and Microsoft 365 OAuth authorization-code flows
-- encrypted refresh/access tokens
-- scheduled worker with retry attempts
-- manual sync endpoint
-- UID-based incremental mailbox scanning
-- MIME parsing and safe attachment extraction
-- optional bounded ZIP extraction
-- local attachment staging volume
-- message, attachment, sync-run and activity-event tables
-- per-message and per-attachment duplicate protection
-- message/activity APIs and worker smoke tests
-- UI buttons for OAuth and manual synchronization
 
-## Operational notes
-OAuth requires application credentials in `.env` and exact callback URLs registered with Google or Microsoft.
-Extracted attachments remain in the Docker `attachment_data` volume until routing/storage is added in Step 010.
+- storage-destination model and CRUD API
+- default local destination mounted at `/data/routed`
+- rules scoped globally or to one email account
+- regular-expression filters for sender, recipient, subject, filename and content type
+- optional minimum and maximum attachment size
+- rule priority and stop-processing behavior
+- multiple destinations per rule
+- safe dynamic folder templates
+- supported variables: `year`, `month`, `day`, `sender`, `sender_email`, `subject`, `filename`, `extension`
+- rule simulation API with match explanations
+- automatic local copy after attachment ingestion
+- per-rule/per-attachment/per-destination execution deduplication
+- React rule builder and simulation interface
+- migration `0005`, unit tests and CI smoke tests
+
+## Not included yet
+
+- Google Drive, OneDrive, Dropbox, S3, WebDAV, SFTP and SMB providers
+- remote-provider retry queue
+- production installer and upgrade UI
+
+These arrive in Steps 010–012.
 
 ## Acceptance criteria
+
 ```bash
 make init
 make check
@@ -33,4 +41,5 @@ make auth-smoke
 make frontend-smoke
 make email-account-smoke
 make mail-engine-smoke
+make rule-engine-smoke
 ```

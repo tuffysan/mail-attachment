@@ -66,3 +66,9 @@ button.danger:hover { background: #991b1b; }
 @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } .account-card { align-items: flex-start; flex-direction: column; } }
 
 .oauth-actions{display:grid;gap:8px;margin:16px 0}.oauth-actions button{margin:0}
+
+select { width: 100%; border: 1px solid #334155; border-radius: 12px; padding: 12px; background: #0f172a; color: #e2e8f0; }
+.destination-grid { display: grid; gap: 8px; margin: 10px 0 18px; }
+.simulation { margin-top: 24px; border-top: 1px solid #334155; padding-top: 18px; }
+.simulation-row { display: grid; gap: 4px; padding: 12px; margin-top: 8px; border-radius: 12px; background: rgba(127,29,29,.25); }
+.simulation-row.matched { background: rgba(22,101,52,.28); }

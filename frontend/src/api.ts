@@ -91,3 +91,30 @@ export function startOAuth(provider: 'google' | 'microsoft'): Promise<{authoriza
 export function listActivity(): Promise<Array<{id:string;level:string;event_type:string;message:string;created_at:string}>> {
   return request('/api/v1/activity')
 }
+
+
+export function listStorageDestinations() {
+  return request<import('./types').StorageDestination[]>('/api/v1/storage-destinations')
+}
+
+export function listRules() {
+  return request<import('./types').AttachmentRule[]>('/api/v1/rules')
+}
+
+export function createRule(payload: Record<string, unknown>) {
+  return request<import('./types').AttachmentRule>('/api/v1/rules', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteRule(id: string) {
+  return request<void>(`/api/v1/rules/${id}`, { method: 'DELETE' })
+}
+
+export function simulateRules(payload: Record<string, unknown>) {
+  return request<import('./types').RuleSimulationResult[]>('/api/v1/rules/simulate', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}

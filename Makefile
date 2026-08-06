@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
-.PHONY: help init check config build test frontend-build up down restart ps logs wait api-smoke frontend-smoke migrate migration-smoke migration-cycle auth-smoke email-account-smoke mail-engine-smoke clean reset
+.PHONY: help init check config build test frontend-build up down restart ps logs wait api-smoke frontend-smoke migrate migration-smoke migration-cycle auth-smoke email-account-smoke mail-engine-smoke rule-engine-smoke clean reset
 
 help:
 	@printf '%s\n' \
@@ -22,6 +22,7 @@ help:
 	  '  make frontend-smoke Verify the web UI and reverse proxy' \
 	  '  make email-account-smoke Verify email account CRUD API' \
 	  '  make mail-engine-smoke Verify worker and mail engine APIs' \
+	  '  make rule-engine-smoke Verify rule CRUD and simulation' \
 	  '  make ps         Show service status' \
 	  '  make logs       Follow service logs' \
 	  '  make down       Stop services' \
@@ -83,6 +84,9 @@ email-account-smoke:
 
 mail-engine-smoke:
 	@./scripts/mail-engine-smoke.sh
+
+rule-engine-smoke:
+	@./scripts/rule-engine-smoke.sh
 
 down:
 	@docker compose --env-file .env -f compose.yml down

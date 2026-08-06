@@ -101,6 +101,7 @@ services:
       start_period: 15s
     volumes:
       - attachment_data:/data/attachments
+      - routed_data:/data/routed
     networks:
       - mailhub_internal
     security_opt:
@@ -134,6 +135,7 @@ services:
       TZ: ${TZ:-UTC}
     volumes:
       - attachment_data:/data/attachments
+      - routed_data:/data/routed
     depends_on:
       postgres:
         condition: service_healthy
@@ -174,3 +176,4 @@ volumes:
   postgres_data:
   redis_data:
   attachment_data:
+  routed_data:

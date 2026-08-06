@@ -56,3 +56,39 @@ export interface ConnectionTestResponse {
   mailbox: string
   message_count: number | null
 }
+
+
+export interface StorageDestination {
+  id: string
+  name: string
+  provider: string
+  base_path: string
+  is_enabled: boolean
+}
+
+export interface AttachmentRule {
+  id: string
+  name: string
+  email_account_id: string | null
+  priority: number
+  is_enabled: boolean
+  stop_processing: boolean
+  sender_pattern: string | null
+  recipient_pattern: string | null
+  subject_pattern: string | null
+  filename_pattern: string | null
+  content_type_pattern: string | null
+  min_size_bytes: number | null
+  max_size_bytes: number | null
+  folder_template: string
+  destination_ids: string[]
+}
+
+export interface RuleSimulationResult {
+  rule_id: string
+  rule_name: string
+  matched: boolean
+  reasons: string[]
+  rendered_folder: string | null
+  destination_ids: string[]
+}
