@@ -180,3 +180,8 @@ export function completeSetup() {
     }),
   })
 }
+
+
+export function getOperationsDashboard() {
+  return request<import('./types').OperationsDashboard>('/api/v1/operations/dashboard')
+}

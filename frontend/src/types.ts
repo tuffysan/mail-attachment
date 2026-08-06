@@ -114,3 +114,58 @@ export interface SetupStatus {
   has_storage_destination: boolean
   has_rule: boolean
 }
+
+
+export interface OperationsDashboard {
+  generated_at: string
+  overall_status: 'ok' | 'degraded'
+  counts: {
+    email_accounts: number
+    enabled_email_accounts: number
+    messages: number
+    attachments: number
+    successful_routes: number
+    failed_routes: number
+    pending_routes: number
+    healthy_storage_destinations: number
+    failed_storage_destinations: number
+  }
+  health: Record<string, {
+    status: string
+    detail: string
+    latency_ms: number | null
+  }>
+  workers: Array<{
+    name: string
+    state: string
+    started_at: string | null
+    heartbeat_at: string | null
+    last_activity_at: string | null
+    processed_cycles: number
+    failures: number
+    last_error: string | null
+  }>
+  storage: Array<{
+    id: string
+    name: string
+    provider: string
+    enabled: boolean
+    status: string
+    message: string | null
+    checked_at: string | null
+  }>
+  recent_activity: Array<{
+    id: string
+    level: string
+    event_type: string
+    message: string
+    created_at: string
+  }>
+  recent_failures: Array<{
+    id: string
+    kind: string
+    subject: string
+    detail: string
+    created_at: string
+  }>
+}

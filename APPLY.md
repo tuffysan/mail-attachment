@@ -1,12 +1,12 @@
-# Apply First Boot Wizard
+# Apply Operations Dashboard
 
-This is an overlay package. Copy its contents over the repository without
-deleting existing files or `.git`.
+This is an overlay package. Copy it over the repository without deleting
+existing files or `.git`.
 
 ## Windows PowerShell
 
 ```powershell
-$Source = "C:\Temp\mail-attachment-hub-first-boot-wizard"
+$Source = "C:\Temp\mail-attachment-hub-operations-dashboard"
 $Repo   = "C:\Git\mail-attachment"
 
 Get-ChildItem $Source -Force |
@@ -29,13 +29,12 @@ docker compose --env-file .env -f compose.yml run --rm --no-deps `
 docker compose --env-file .env -f compose.yml up -d --build
 ```
 
-Open `http://SERVER-IP:3000`, sign in with the generated credentials and
-complete the wizard.
+Open `/admin` after signing in as an administrator.
 
 ## Commit
 
 ```powershell
 git add -A
-git commit -m "feat(setup): add first boot configuration wizard"
+git commit -m "feat(operations): add administration dashboard"
 git push origin main
 ```
