@@ -1,9 +1,9 @@
-import shutil
 from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from mailhub.config import Settings
 from mailhub.db.models import (
     Attachment,
     AttachmentRule,
@@ -13,12 +13,15 @@ from mailhub.db.models import (
     StorageDestination,
 )
 from mailhub.rules.engine import RuleInput, evaluate_rule, render_folder
+from mailhub.storage.crypto import decrypt_config
+from mailhub.storage.rclone import upload_file
 
 
 async def route_attachment(
     session: AsyncSession,
     attachment: Attachment,
     message: MailMessage,
+    settings: Settings,
 ) -> int:
     rules = (await session.scalars(
         select(AttachmentRule)
@@ -38,51 +41,49 @@ async def route_attachment(
     )
     routed = 0
     for rule in rules:
-        result = evaluate_rule(rule, item)
-        if not result.matched:
+        match = evaluate_rule(rule, item)
+        if not match.matched:
             continue
 
         links = (await session.scalars(
             select(RuleDestination).where(RuleDestination.rule_id == rule.id)
         )).all()
         for link in links:
-            existing = await session.scalar(select(RuleExecution).where(
+            execution = await session.scalar(select(RuleExecution).where(
                 RuleExecution.rule_id == rule.id,
                 RuleExecution.attachment_id == attachment.id,
                 RuleExecution.destination_id == link.destination_id,
             ))
-            if existing and existing.status == "succeeded":
+            if execution and execution.status == "succeeded":
                 continue
 
             destination = await session.get(StorageDestination, link.destination_id)
             if destination is None or not destination.is_enabled:
                 continue
 
-            execution = existing or RuleExecution(
+            execution = execution or RuleExecution(
                 rule_id=rule.id,
                 attachment_id=attachment.id,
                 destination_id=destination.id,
                 status="running",
             )
             session.add(execution)
-            try:
-                relative = Path(render_folder(rule.folder_template, item)) / attachment.safe_filename
-                target = Path(destination.base_path) / relative
-                target.parent.mkdir(parents=True, exist_ok=True)
-
-                if destination.provider != "local":
-                    raise RuntimeError(
-                        f"Provider {destination.provider!r} is configured but will be implemented in Step 010"
-                    )
-
-                shutil.copy2(attachment.local_path, target)
-                execution.status = "succeeded"
-                execution.target_path = str(target)
-                execution.error_message = None
+            relative_path = str(
+                Path(render_folder(rule.folder_template, item)) / attachment.safe_filename
+            )
+            result = await upload_file(
+                destination.provider,
+                destination.base_path,
+                decrypt_config(settings.app_secret_key, destination.encrypted_config),
+                attachment.local_path,
+                relative_path,
+                retries=settings.storage_retry_attempts,
+            )
+            execution.status = "succeeded" if result.ok else "failed"
+            execution.target_path = result.target
+            execution.error_message = None if result.ok else result.message[:2000]
+            if result.ok:
                 routed += 1
-            except Exception as exc:
-                execution.status = "failed"
-                execution.error_message = str(exc)[:2000]
             await session.flush()
 
         if rule.stop_processing:

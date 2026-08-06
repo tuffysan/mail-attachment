@@ -118,3 +118,29 @@ export function simulateRules(payload: Record<string, unknown>) {
     body: JSON.stringify(payload),
   })
 }
+
+
+export function listStorageProviders() {
+  return request<import('./types').StorageProvider[]>('/api/v1/storage/providers')
+}
+
+export function listManagedStorageDestinations() {
+  return request<import('./types').StorageDestination[]>('/api/v1/storage/destinations')
+}
+
+export function createStorageDestination(payload: Record<string, unknown>) {
+  return request<import('./types').StorageDestination>('/api/v1/storage/destinations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteStorageDestination(id: string) {
+  return request<void>(`/api/v1/storage/destinations/${id}`, { method: 'DELETE' })
+}
+
+export function testStorageDestination(id: string) {
+  return request<{status:string;message:string}>(`/api/v1/storage/destinations/${id}/test`, {
+    method: 'POST',
+  })
+}

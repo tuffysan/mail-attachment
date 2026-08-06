@@ -4,7 +4,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-RUN groupadd --system --gid 10001 mailhub \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends rclone ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 mailhub \
     && useradd --system --uid 10001 --gid mailhub --create-home mailhub
 
 WORKDIR /app

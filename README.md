@@ -1,27 +1,32 @@
 # Mail Attachment Hub
 
-Mail Attachment Hub securely collects email attachments and routes them according to user-defined rules.
+Mail Attachment Hub securely collects email attachments and routes them to one or more storage services.
 
 ## Current delivery
 
-**Sprint 0 · Step 009 — complete attachment rule engine**
+**Sprint 0 · Step 010 — complete storage platform**
 
-This snapshot includes:
+The application now includes:
 
-- FastAPI, React, PostgreSQL, Redis and scheduled worker
-- local admin login and JWT
 - multiple encrypted IMAP accounts
-- Gmail and Microsoft OAuth foundations
-- incremental mailbox sync and attachment extraction
-- duplicate protection and activity history
-- rule priorities and stop-processing behavior
-- filters for sender, recipient, subject, filename, content type and size
+- Gmail and Microsoft mail OAuth foundations
+- scheduled attachment ingestion
+- advanced attachment rules
 - multiple destinations per rule
-- dynamic folder templates
-- rule simulation in the web interface
-- automatic routing to a persistent local destination
-
-Remote storage providers are added in Step 010.
+- local storage
+- Google Drive
+- OneDrive
+- Dropbox
+- S3 and MinIO
+- Azure Blob Storage
+- WebDAV and Nextcloud
+- SFTP
+- SMB/NAS
+- encrypted storage configuration
+- connection testing and health state
+- upload retries and execution deduplication
+- React management pages
+- Docker Compose and GitHub Actions
 
 ## Start locally
 
@@ -30,7 +35,7 @@ make init
 make check
 make test
 make up
-make rule-engine-smoke
+make storage-platform-smoke
 ```
 
 Open:
@@ -38,12 +43,20 @@ Open:
 - UI: `http://127.0.0.1:3000`
 - API docs: `http://127.0.0.1:8080/docs`
 
-## Example rule
+## Configure storage
 
-- Sender: `@supplier\.com$`
-- Subject: `invoice|faktura`
-- Filename: `\.pdf$`
-- Folder: `Invoices/{year}/{month}/{sender}`
-- Destination: `Local routed files`
+Open **Lagring** in the web interface. Create a destination, enter the provider fields and press **Testa**.
 
-Bilagor kopieras till Docker-volymen `routed_data`.
+OAuth providers currently accept rclone-compatible token JSON. Generate it on a trusted computer:
+
+```bash
+rclone authorize drive
+rclone authorize onedrive
+rclone authorize dropbox
+```
+
+Paste the resulting token JSON into the provider's token field.
+
+## Security
+
+Provider credentials are encrypted with a key derived from `APP_SECRET_KEY`. Never commit `.env`, and do not change `APP_SECRET_KEY` after credentials are stored unless all credentials are re-entered.

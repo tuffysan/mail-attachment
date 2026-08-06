@@ -81,6 +81,7 @@ export function DashboardPage() {
           <p className="muted">Lägg till flera IMAP-konton, spara uppgifterna krypterat och testa anslutningen direkt.</p>
           <Link className="button-link" to="/email-accounts">Hantera e-postkonton</Link>
           <Link className="button-link" to="/rules">Hantera regler</Link>
+          <Link className="button-link secondary" to="/storage">Hantera lagring</Link>
         </section>
       </main>
     </div>

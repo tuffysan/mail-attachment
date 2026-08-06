@@ -120,6 +120,9 @@ class StorageDestination(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     base_path: Mapped[str] = mapped_column(Text, nullable=False, default="/data/routed", server_default="/data/routed")
     encrypted_config: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    last_test_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    last_test_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_test_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AttachmentRule(UUIDPrimaryKeyMixin, TimestampMixin, Base):

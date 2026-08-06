@@ -4,6 +4,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { EmailAccountsPage } from './pages/EmailAccountsPage'
 import { RulesPage } from './pages/RulesPage'
+import { StoragePage } from './pages/StoragePage'
 
 export function App() {
   return (
@@ -13,6 +14,7 @@ export function App() {
         <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/email-accounts" element={<ProtectedRoute><EmailAccountsPage /></ProtectedRoute>} />
         <Route path="/rules" element={<ProtectedRoute><RulesPage /></ProtectedRoute>} />
+        <Route path="/storage" element={<ProtectedRoute><StoragePage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

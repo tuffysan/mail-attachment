@@ -59,12 +59,16 @@ export interface ConnectionTestResponse {
 
 
 export interface StorageDestination {
-  id: string
-  name: string
-  provider: string
-  base_path: string
-  is_enabled: boolean
-}
+      id: string
+      name: string
+      provider: string
+      base_path: string
+      is_enabled: boolean
+      configured_fields: string[]
+      last_test_status: string | null
+      last_test_message: string | null
+      last_test_at: string | null
+    }
 
 export interface AttachmentRule {
   id: string
@@ -91,4 +95,12 @@ export interface RuleSimulationResult {
   reasons: string[]
   rendered_folder: string | null
   destination_ids: string[]
+}
+
+
+export interface StorageProvider {
+  key: string
+  label: string
+  fields: string[]
+  secret_fields: string[]
 }
