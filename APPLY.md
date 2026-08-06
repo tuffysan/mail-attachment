@@ -1,35 +1,26 @@
-# Apply complete LXC installer fix
+# Apply the systemd-based LXC installer
 
-Copy these files over the repository:
+Copy:
 
 - `proxmox/install.sh`
-- `compose.yml`
-- `.env.example`
+- `compose.override.lxc.yml`
 
-## Windows PowerShell
+Commit:
 
 ```powershell
-$Source = "C:\Temp\mail-attachment-hub-lxc-installer-complete-fix"
-$Repo   = "C:\Git\mail-attachment"
-
-Get-ChildItem $Source -Force |
-  Where-Object { $_.Name -ne "APPLY.md" } |
-  Copy-Item -Destination $Repo -Recurse -Force
-
-Set-Location $Repo
-git add proxmox/install.sh compose.yml .env.example
-git commit -m "fix(installer): make LXC installation complete reliably"
+git add proxmox/install.sh compose.override.lxc.yml
+git commit -m "fix(installer): run LXC setup as monitored systemd job"
 git push origin main
 ```
 
-## Verify GitHub file
+Verify the new installer:
 
 ```bash
 curl -fsSL "https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh?$(date +%s)" |
-  grep "Kontroll %02d/90"
+  grep "systemd-run"
 ```
 
-## Clean installation
+Clean installation:
 
 ```bash
 pct stop 134 2>/dev/null || true

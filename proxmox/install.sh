@@ -3,7 +3,6 @@ set -Eeuo pipefail
 
 REPO="${REPO:-tuffysan/mail-attachment}"
 BRANCH="${BRANCH:-main}"
-
 CTID="${CTID:-}"
 HOSTNAME="${HOSTNAME:-mail-attachment-hub}"
 STORAGE="${STORAGE:-local-lvm}"
@@ -24,10 +23,10 @@ API_PORT="${API_PORT:-8080}"
 CURRENT_STEP="start"
 CREATED_CT=0
 DOWNLOADED_TEMPLATE=""
-TEMP_INNER_SCRIPT=""
+TMP_INNER=""
 
 cleanup() {
-  [[ -n "$TEMP_INNER_SCRIPT" && -f "$TEMP_INNER_SCRIPT" ]] && rm -f "$TEMP_INNER_SCRIPT"
+  [[ -z "$TMP_INNER" || ! -f "$TMP_INNER" ]] || rm -f "$TMP_INNER"
 }
 trap cleanup EXIT
 
@@ -42,14 +41,9 @@ on_error() {
   echo "Exitkod: ${code}" >&2
   if [[ "$CREATED_CT" == "1" ]]; then
     echo >&2
-    echo "LXC ${CTID} finns kvar för felsökning." >&2
-    echo "Öppna den med: pct enter ${CTID}" >&2
-    echo "Visa loggen med:" >&2
-    echo "  pct exec ${CTID} -- cat /root/mailhub-install.log" >&2
-    echo >&2
-    echo "Ta bort containern med:" >&2
-    echo "  pct stop ${CTID} 2>/dev/null || true" >&2
-    echo "  pct destroy ${CTID} --purge" >&2
+    echo "LXC ${CTID} finns kvar." >&2
+    echo "Logg: pct exec ${CTID} -- cat /root/mailhub-install.log" >&2
+    echo "Status: pct exec ${CTID} -- cat /root/mailhub-install.status" >&2
   fi
   exit "$code"
 }
@@ -59,11 +53,11 @@ log() {
   printf '\n[%(%H:%M:%S)T] %s\n' -1 "$*"
 }
 
-require_root_and_proxmox() {
+require_environment() {
   [[ $EUID -eq 0 ]] || { echo "Kör som root på Proxmox."; exit 1; }
   for cmd in pct pvesh pveam pvesm; do
     command -v "$cmd" >/dev/null 2>&1 || {
-      echo "${cmd} saknas. Kör scriptet direkt på Proxmox-värden."
+      echo "${cmd} saknas. Kör på Proxmox-värden."
       exit 1
     }
   done
@@ -71,10 +65,10 @@ require_root_and_proxmox() {
 
 choose_ctid() {
   [[ -n "$CTID" ]] || CTID="$(pvesh get /cluster/nextid)"
-  if pct status "$CTID" >/dev/null 2>&1; then
+  pct status "$CTID" >/dev/null 2>&1 && {
     echo "LXC-ID ${CTID} används redan."
     exit 1
-  fi
+  }
 }
 
 validate_storage() {
@@ -94,14 +88,12 @@ download_template() {
   CURRENT_STEP="hämtar Debian 12-template"
   log "$CURRENT_STEP"
   pveam update >/dev/null
-
   DOWNLOADED_TEMPLATE="$(
     pveam available --section system |
       awk '/debian-12-standard/ {print $2}' |
       sort -V |
       tail -n 1
   )"
-
   [[ -n "$DOWNLOADED_TEMPLATE" ]] || {
     echo "Ingen Debian 12-template hittades."
     exit 1
@@ -111,8 +103,6 @@ download_template() {
       grep -q "/${DOWNLOADED_TEMPLATE}$"; then
     pveam download "$TEMPLATE_STORAGE" "$DOWNLOADED_TEMPLATE"
   fi
-
-  log "Vald template: ${DOWNLOADED_TEMPLATE}"
 }
 
 create_container() {
@@ -149,10 +139,9 @@ create_container() {
   pct start "$CTID"
 }
 
-wait_for_container() {
-  CURRENT_STEP="väntar på LXC och nätverk"
+wait_for_network() {
+  CURRENT_STEP="väntar på nätverk"
   log "$CURRENT_STEP"
-
   for attempt in $(seq 1 60); do
     printf "\rKontroll %02d/60" "$attempt"
     if pct exec "$CTID" -- getent hosts github.com >/dev/null 2>&1; then
@@ -166,14 +155,21 @@ wait_for_container() {
   exit 1
 }
 
-create_inner_script() {
-  TEMP_INNER_SCRIPT="$(mktemp /tmp/mailhub-inside.XXXXXX.sh)"
-
-  cat > "$TEMP_INNER_SCRIPT" <<'INNER_SCRIPT'
+build_inner_script() {
+  TMP_INNER="$(mktemp /tmp/mailhub-inner.XXXXXX.sh)"
+  cat > "$TMP_INNER" <<'INNER'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
 exec > >(tee -a /root/mailhub-install.log) 2>&1
+echo "RUNNING" > /root/mailhub-install.status
+
+fail() {
+  local code=$?
+  echo "FAILED:${code}" > /root/mailhub-install.status
+  exit "$code"
+}
+trap fail ERR
 
 REPO="${REPO:?}"
 BRANCH="${BRANCH:?}"
@@ -199,14 +195,8 @@ replace_env() {
 
 step "Installerar systempaket"
 export DEBIAN_FRONTEND=noninteractive
-export LANG=C.UTF-8
-export LC_ALL=C.UTF-8
-
 apt-get update
-apt-get install -y \
-  ca-certificates curl git jq locales openssl iproute2
-
-locale-gen C.UTF-8 >/dev/null 2>&1 || true
+apt-get install -y ca-certificates curl git jq openssl iproute2
 
 step "Installerar Docker"
 if ! command -v docker >/dev/null 2>&1; then
@@ -214,41 +204,16 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 systemctl enable --now docker
 
-if ! docker compose version >/dev/null 2>&1; then
-  apt-get update
-  apt-get install -y docker-compose-plugin
-fi
-
-step "Hämtar Mail Attachment Hub"
-if [[ -d "${INSTALL_DIR}/.git" ]]; then
-  git -C "$INSTALL_DIR" fetch origin "$BRANCH"
-  git -C "$INSTALL_DIR" reset --hard "origin/$BRANCH"
-else
-  rm -rf "$INSTALL_DIR"
-  git clone --branch "$BRANCH" "https://github.com/${REPO}.git" "$INSTALL_DIR"
-fi
-
+step "Hämtar projektet"
+rm -rf "$INSTALL_DIR"
+git clone --branch "$BRANCH" "https://github.com/${REPO}.git" "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
-if [[ ! -f .env ]]; then
-  cp .env.example .env
-fi
+cp .env.example .env
 
 POSTGRES_PASSWORD="$(openssl rand -base64 36 | tr -d '\n' | tr '/+' '_-')"
 APP_SECRET_KEY="$(openssl rand -hex 48)"
 ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '\n' | tr '/+' '_-')"
-
-# Preserve existing generated secrets on rerun.
-existing_postgres="$(sed -n 's/^POSTGRES_PASSWORD=//p' .env | head -1)"
-existing_secret="$(sed -n 's/^APP_SECRET_KEY=//p' .env | head -1)"
-existing_admin_password="$(sed -n 's/^ADMIN_PASSWORD=//p' .env | head -1)"
-
-[[ -z "$existing_postgres" || "$existing_postgres" == change-* ]] ||
-  POSTGRES_PASSWORD="$existing_postgres"
-[[ -z "$existing_secret" || "$existing_secret" == replace-* ]] ||
-  APP_SECRET_KEY="$existing_secret"
-[[ -z "$existing_admin_password" || "$existing_admin_password" == replace-* ]] ||
-  ADMIN_PASSWORD="$existing_admin_password"
 
 replace_env POSTGRES_PASSWORD "$POSTGRES_PASSWORD"
 replace_env APP_SECRET_KEY "$APP_SECRET_KEY"
@@ -268,13 +233,13 @@ API_PORT=${API_PORT}
 EOF
 chmod 600 /root/mailhub-credentials.env
 
-step "Bygger Docker-images"
-docker compose --env-file .env -f compose.yml build --pull
+step "Bygger images"
+docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml build --pull
 
 step "Startar tjänster"
-docker compose --env-file .env -f compose.yml up -d
+docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml up -d
 
-step "Kontrollerar tjänster"
+step "Väntar på webbgränssnitt och API"
 api_ok=0
 frontend_ok=0
 
@@ -289,36 +254,32 @@ for attempt in $(seq 1 90); do
     "$([[ "$api_ok" == 1 ]] && echo OK || echo väntar)" \
     "$([[ "$frontend_ok" == 1 ]] && echo OK || echo väntar)"
 
-  if [[ "$api_ok" == 1 && "$frontend_ok" == 1 ]]; then
-    echo
-    break
-  fi
+  [[ "$api_ok" == 1 && "$frontend_ok" == 1 ]] && break
   sleep 2
 done
 echo
 
-docker compose --env-file .env -f compose.yml ps
+docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml ps
 
-if [[ "$api_ok" != 1 || "$frontend_ok" != 1 ]]; then
-  echo "Tjänsterna startade men svarar inte korrekt."
-  docker compose --env-file .env -f compose.yml logs --tail=120 backend frontend
+[[ "$api_ok" == 1 && "$frontend_ok" == 1 ]] || {
+  docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml logs --tail=150 backend frontend
   exit 1
-fi
+}
 
-if ! ss -lnt | grep -qE "0\.0\.0\.0:${WEB_PORT}|:::${WEB_PORT}"; then
-  echo "Frontend-port ${WEB_PORT} exponeras inte på nätverket."
+ss -lnt | grep -qE "0\.0\.0\.0:${WEB_PORT}|:::${WEB_PORT}" || {
+  echo "Frontend-port ${WEB_PORT} exponeras inte."
   ss -lnt
   exit 1
-fi
+}
 
-if ! ss -lnt | grep -qE "0\.0\.0\.0:${API_PORT}|:::${API_PORT}"; then
-  echo "Backend-port ${API_PORT} exponeras inte på nätverket."
+ss -lnt | grep -qE "0\.0\.0\.0:${API_PORT}|:::${API_PORT}" || {
+  echo "API-port ${API_PORT} exponeras inte."
   ss -lnt
   exit 1
-fi
+}
 
-step "Installerar administrationskommando"
-cat > /usr/local/bin/mailhub <<'MAILHUB_CLI'
+step "Installerar mailhub-kommandot"
+cat > /usr/local/bin/mailhub <<'CLI'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 cd /opt/mail-attachment-hub
@@ -327,85 +288,99 @@ IP="$(hostname -I | awk '{print $1}')"
 
 case "${1:-help}" in
   status)
-    docker compose --env-file .env -f compose.yml ps
-    curl -sS "http://127.0.0.1:${API_PORT}/health/ready" | jq . || true
+    docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml ps
     ;;
   logs)
     shift || true
-    docker compose --env-file .env -f compose.yml logs -f --tail=200 "$@"
-    ;;
-  restart)
-    docker compose --env-file .env -f compose.yml restart
-    ;;
-  start)
-    docker compose --env-file .env -f compose.yml up -d
-    ;;
-  stop)
-    docker compose --env-file .env -f compose.yml down
+    docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml logs -f --tail=200 "$@"
     ;;
   credentials)
     cat <<INFO
 ============================================================
  Mail Attachment Hub
 ============================================================
-Web UI:  http://${IP}:${WEB_PORT}
-API:     http://${IP}:${API_PORT}
-Login:   ${ADMIN_EMAIL}
+Web UI:   http://${IP}:${WEB_PORT}
+API:      http://${IP}:${API_PORT}
+Login:    ${ADMIN_EMAIL}
 Password: ${ADMIN_PASSWORD}
 ============================================================
 INFO
     ;;
   *)
-    echo "mailhub status|logs|restart|start|stop|credentials"
+    echo "mailhub status | logs | credentials"
     ;;
 esac
-MAILHUB_CLI
+CLI
 chmod +x /usr/local/bin/mailhub
 
-cat > /etc/systemd/system/mailhub-compose.service <<EOF
-[Unit]
-Description=Mail Attachment Hub
-Requires=docker.service
-After=docker.service network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=${INSTALL_DIR}
-ExecStart=/usr/bin/docker compose --env-file .env -f compose.yml up -d
-ExecStop=/usr/bin/docker compose --env-file .env -f compose.yml down
-TimeoutStartSec=0
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable mailhub-compose.service
-
-touch /root/mailhub-install-complete
-step "Installationen i LXC är klar"
-INNER_SCRIPT
-
-  chmod +x "$TEMP_INNER_SCRIPT"
+echo "COMPLETE" > /root/mailhub-install.status
+step "Installation klar"
+INNER
+  chmod +x "$TMP_INNER"
 }
 
-run_inner_script() {
-  CURRENT_STEP="installerar applikationen i LXC"
+start_install_job() {
+  CURRENT_STEP="startar installationstjänst i LXC"
   log "$CURRENT_STEP"
 
-  pct push "$CTID" "$TEMP_INNER_SCRIPT" /root/mailhub-install-inside.sh \
-    --perms 0755
+  pct push "$CTID" "$TMP_INNER" /root/mailhub-install-inside.sh --perms 0755
 
-  pct exec "$CTID" -- env \
-    REPO="$REPO" \
-    BRANCH="$BRANCH" \
-    ADMIN_EMAIL="$ADMIN_EMAIL" \
-    TZ="$TZ" \
-    WEB_PORT="$WEB_PORT" \
-    API_PORT="$API_PORT" \
-    /root/mailhub-install-inside.sh
+  pct exec "$CTID" -- bash -lc "
+    rm -f /root/mailhub-install.status /root/mailhub-install.log
+    systemd-run \
+      --unit=mailhub-install \
+      --property=Type=exec \
+      --setenv=REPO='${REPO}' \
+      --setenv=BRANCH='${BRANCH}' \
+      --setenv=ADMIN_EMAIL='${ADMIN_EMAIL}' \
+      --setenv=TZ='${TZ}' \
+      --setenv=WEB_PORT='${WEB_PORT}' \
+      --setenv=API_PORT='${API_PORT}' \
+      /root/mailhub-install-inside.sh
+  "
+}
+
+monitor_install_job() {
+  CURRENT_STEP="installerar applikationen"
+  log "$CURRENT_STEP"
+
+  local last_lines=""
+  for attempt in $(seq 1 300); do
+    local status
+    status="$(pct exec "$CTID" -- bash -lc 'cat /root/mailhub-install.status 2>/dev/null || echo STARTING')"
+
+    printf "\rStatus: %-12s  Kontroll %03d/300" "$status" "$attempt"
+
+    if [[ "$status" == "COMPLETE" ]]; then
+      echo
+      return
+    fi
+
+    if [[ "$status" == FAILED:* ]]; then
+      echo
+      echo "Installationstjänsten rapporterade fel: ${status}"
+      pct exec "$CTID" -- tail -n 160 /root/mailhub-install.log
+      exit 1
+    fi
+
+    # Every 10 seconds show the latest meaningful progress line.
+    if (( attempt % 5 == 0 )); then
+      local current
+      current="$(pct exec "$CTID" -- bash -lc "grep -E '^\[[0-9]{2}:[0-9]{2}:[0-9]{2}\]' /root/mailhub-install.log 2>/dev/null | tail -1" || true)"
+      if [[ -n "$current" && "$current" != "$last_lines" ]]; then
+        echo
+        echo "$current"
+        last_lines="$current"
+      fi
+    fi
+
+    sleep 2
+  done
+
+  echo
+  echo "Installationen tog längre än 10 minuter."
+  pct exec "$CTID" -- tail -n 160 /root/mailhub-install.log
+  exit 1
 }
 
 show_result() {
@@ -423,30 +398,31 @@ show_result() {
   echo "============================================================"
   echo " Mail Attachment Hub installerades korrekt"
   echo "============================================================"
-  echo "LXC-ID:       ${CTID}"
-  echo "IP-adress:    ${ip}"
+  echo "LXC-ID:   ${CTID}"
+  echo "IP:       ${ip}"
   echo
-  echo "Web UI:       http://${ip}:${web_port}"
-  echo "API:          http://${ip}:${api_port}"
+  echo "Web UI:   http://${ip}:${web_port}"
+  echo "API:      http://${ip}:${api_port}"
   echo
-  echo "Login:        ${email}"
-  echo "Password:     ${password}"
+  echo "Login:    ${email}"
+  echo "Password: ${password}"
   echo
-  echo "Senare visning:"
+  echo "Visa uppgifterna senare:"
   echo "  pct enter ${CTID}"
   echo "  mailhub credentials"
   echo "============================================================"
 }
 
 main() {
-  require_root_and_proxmox
+  require_environment
   choose_ctid
   validate_storage
   download_template
   create_container
-  wait_for_container
-  create_inner_script
-  run_inner_script
+  wait_for_network
+  build_inner_script
+  start_install_job
+  monitor_install_job
   show_result
 }
 
