@@ -72,3 +72,18 @@ select { width: 100%; border: 1px solid #334155; border-radius: 12px; padding: 1
 .simulation { margin-top: 24px; border-top: 1px solid #334155; padding-top: 18px; }
 .simulation-row { display: grid; gap: 4px; padding: 12px; margin-top: 8px; border-radius: 12px; background: rgba(127,29,29,.25); }
 .simulation-row.matched { background: rgba(22,101,52,.28); }
+
+
+.wizard-shell { min-height: 100vh; padding: 36px 20px; display: grid; place-items: center; }
+.wizard-card { width: min(100%, 820px); padding: 34px; border: 1px solid rgba(148,163,184,.22); border-radius: 26px; background: rgba(15,23,42,.92); box-shadow: 0 28px 80px rgba(0,0,0,.4); }
+.wizard-header { display: flex; gap: 20px; align-items: flex-start; }
+.wizard-header .brand-mark { flex: 0 0 auto; }
+.wizard-header h1 { font-size: clamp(1.8rem,4vw,2.8rem); }
+.wizard-progress { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin: 28px 0; }
+.wizard-progress span { display: grid; place-items: center; height: 8px; overflow: hidden; color: transparent; border-radius: 999px; background: #334155; }
+.wizard-progress span.active { background: #3b82f6; box-shadow: 0 0 18px rgba(59,130,246,.45); }
+.wizard-actions { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 12px; }
+.wizard-actions button { margin: 0; }
+.setup-summary { margin: 22px 0; padding: 20px; border-radius: 16px; background: rgba(15,23,42,.75); border: 1px solid #334155; }
+.setup-summary p { margin: 8px 0; }
+@media (max-width:640px) { .wizard-card { padding: 24px 18px; } .wizard-header { flex-direction: column; } .wizard-actions { flex-direction: column-reverse; align-items: stretch; } }

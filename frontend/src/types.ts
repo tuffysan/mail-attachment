@@ -104,3 +104,13 @@ export interface StorageProvider {
   fields: string[]
   secret_fields: string[]
 }
+
+
+export interface SetupStatus {
+  completed: boolean
+  language: string
+  timezone: string
+  has_email_account: boolean
+  has_storage_destination: boolean
+  has_rule: boolean
+}

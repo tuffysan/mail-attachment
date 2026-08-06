@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ApiError, login, setToken } from '../api'
+import { ApiError, getSetupStatus, login, setToken } from '../api'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -16,7 +16,8 @@ export function LoginPage() {
     try {
       const token = await login(email, password)
       setToken(token.access_token)
-      navigate('/', { replace: true })
+      const setup = await getSetupStatus()
+      navigate(setup.completed ? '/' : '/setup', { replace: true })
     } catch (caught) {
       setError(caught instanceof ApiError && caught.status === 401
         ? 'Fel e-postadress eller lösenord.'

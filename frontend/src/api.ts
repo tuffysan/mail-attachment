@@ -11,7 +11,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = sessionStorage.getItem(TOKEN_KEY)
   const headers = new Headers(init.headers)
   headers.set('Accept', 'application/json')
@@ -142,5 +142,41 @@ export function deleteStorageDestination(id: string) {
 export function testStorageDestination(id: string) {
   return request<{status:string;message:string}>(`/api/v1/storage/destinations/${id}/test`, {
     method: 'POST',
+  })
+}
+
+
+export function getSetupStatus() {
+  return request<import('./types').SetupStatus>('/api/v1/setup/status')
+}
+
+export function updateSetupPreferences(payload: {
+  display_name: string
+  language: string
+  timezone: string
+}) {
+  return request<import('./types').SetupStatus>('/api/v1/setup/preferences', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function changeSetupPassword(payload: {
+  current_password: string
+  new_password: string
+}) {
+  return request<void>('/api/v1/setup/password', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function completeSetup() {
+  return request<{completed:boolean}>('/api/v1/setup/complete', {
+    method: 'POST',
+    body: JSON.stringify({
+      acknowledge_backup: true,
+      acknowledge_secret_storage: true,
+    }),
   })
 }
