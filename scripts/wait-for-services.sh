@@ -3,22 +3,28 @@ set -Eeuo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 ./scripts/require-env.sh
 
-for service in postgres redis; do
-  echo "Waiting for ${service}..."
-  for attempt in $(seq 1 60); do
+services=(postgres redis backend)
+for attempt in {1..60}; do
+  all_healthy=1
+  for service in "${services[@]}"; do
     container_id="$(docker compose --env-file .env -f compose.yml ps -q "$service")"
-    if [[ -n "$container_id" ]]; then
-      status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
-      if [[ "$status" == 'healthy' ]]; then
-        echo "${service} is healthy."
-        break
-      fi
+    if [[ -z "$container_id" ]]; then
+      all_healthy=0
+      continue
     fi
-    if [[ "$attempt" -eq 60 ]]; then
-      echo "${service} did not become healthy." >&2
-      docker compose --env-file .env -f compose.yml logs --tail=100 "$service" >&2
-      exit 1
+    health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
+    if [[ "$health" != "healthy" ]]; then
+      all_healthy=0
     fi
-    sleep 2
   done
+  if [[ "$all_healthy" -eq 1 ]]; then
+    echo "PostgreSQL, Redis and backend are healthy."
+    exit 0
+  fi
+  sleep 2
 done
+
+echo "Services did not become healthy in time." >&2
+docker compose --env-file .env -f compose.yml ps >&2
+docker compose --env-file .env -f compose.yml logs --tail=100 >&2
+exit 1

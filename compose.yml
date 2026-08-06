@@ -50,6 +50,39 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mailhub}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mailhub}
+      REDIS_URL: redis://redis:6379/0
+      READINESS_TIMEOUT_SECONDS: ${READINESS_TIMEOUT_SECONDS:-2}
+      TZ: ${TZ:-UTC}
+    ports:
+      - "${BACKEND_BIND_ADDRESS:-127.0.0.1}:${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/live', timeout=2)"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+    networks:
+      - mailhub_internal
+    security_opt:
+      - no-new-privileges:true
+
 networks:
   mailhub_internal:
     driver: bridge

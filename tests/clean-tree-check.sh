@@ -4,11 +4,11 @@ forbidden=("install.sh" "requirements.txt" "app" "systemd" "plugins")
 failed=0
 for path in "${forbidden[@]}"; do
   if [[ -e "$path" ]]; then
-    echo "Legacy prototype path must not exist in Step 002: $path" >&2
+    echo "Legacy prototype path must not exist in Step 003: $path" >&2
     failed=1
   fi
 done
-for dir in backend frontend installer; do
+for dir in frontend installer; do
   if [[ -d "$dir" ]]; then
     unexpected="$(find "$dir" -mindepth 1 -type f ! -name README.md -print -quit)"
     if [[ -n "$unexpected" ]]; then

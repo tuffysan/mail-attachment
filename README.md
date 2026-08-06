@@ -4,18 +4,21 @@ Mail Attachment Hub is an open-source service for collecting email attachments, 
 
 ## Current delivery
 
-**Sprint 0 · Step 002 — Infrastructure dependencies**
+**Sprint 0 · Step 003 — FastAPI backend and health API**
 
-This step provides a reproducible local infrastructure foundation:
+This step adds a production-shaped backend foundation:
 
-- PostgreSQL 16
-- Redis 7
-- Docker Compose health checks
-- generated local secrets
-- localhost-only database ports
-- CI validation and startup test
+- FastAPI application running in Docker
+- PostgreSQL 16 and Redis 7 dependencies
+- `/health/live` process liveness endpoint
+- `/health/ready` dependency readiness endpoint
+- structured JSON logging
+- environment-based configuration
+- backend unit tests
+- full-stack CI smoke test
+- CI support for both `master` and `main`
 
-The backend and frontend are intentionally introduced in later steps. This commit is independently testable and should remain green before application code is added.
+Email collection, storage providers, authentication, rules, and the frontend are intentionally introduced in later steps.
 
 ## Requirements
 
@@ -25,17 +28,33 @@ The backend and frontend are intentionally introduced in later steps. This commi
 - Bash
 - Python 3
 - OpenSSL
+- curl
 
 ## Start
 
 ```bash
 make init
 make check
+make test
 make up
+make api-smoke
 make ps
 ```
 
-PostgreSQL and Redis are bound to `127.0.0.1`, not all host interfaces.
+Open the development API documentation at:
+
+```text
+http://127.0.0.1:8080/docs
+```
+
+Health endpoints:
+
+```text
+http://127.0.0.1:8080/health/live
+http://127.0.0.1:8080/health/ready
+```
+
+PostgreSQL, Redis, and the backend are bound to `127.0.0.1` by default.
 
 ## Stop
 
@@ -52,8 +71,8 @@ make reset
 ## Repository roadmap
 
 - Step 001: repository foundation
-- **Step 002: PostgreSQL, Redis and Docker Compose**
-- Step 003: FastAPI backend and health API
+- Step 002: PostgreSQL, Redis and Docker Compose
+- **Step 003: FastAPI backend and health API**
 - Step 004: database models and Alembic
 - Step 005: React frontend shell
 - Step 006: authentication foundation

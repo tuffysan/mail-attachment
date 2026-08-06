@@ -1,21 +1,24 @@
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
-.PHONY: help init check config up down restart ps logs wait clean reset
+.PHONY: help init check config build test up down restart ps logs wait api-smoke clean reset
 
 help:
 	@printf '%s\n' \
 	  'Mail Attachment Hub development commands' \
 	  '' \
-	  '  make init     Create .env with generated secrets' \
-	  '  make check    Run repository and configuration checks' \
-	  '  make config   Render and validate Docker Compose config' \
-	  '  make up       Start PostgreSQL and Redis' \
-	  '  make wait     Wait until both services are healthy' \
-	  '  make ps       Show service status' \
-	  '  make logs     Follow service logs' \
-	  '  make down     Stop services' \
-	  '  make reset    Delete containers and persistent volumes'
+	  '  make init       Create .env with generated secrets' \
+	  '  make check      Run static repository checks' \
+	  '  make config     Render and validate Docker Compose config' \
+	  '  make build      Build the backend image' \
+	  '  make test       Run backend tests in Docker' \
+	  '  make up         Start backend, PostgreSQL and Redis' \
+	  '  make wait       Wait until all services are healthy' \
+	  '  make api-smoke  Verify live and ready API endpoints' \
+	  '  make ps         Show service status' \
+	  '  make logs       Follow service logs' \
+	  '  make down       Stop services' \
+	  '  make reset      Delete containers and persistent volumes'
 
 init:
 	@./scripts/init-env.sh
@@ -25,17 +28,28 @@ check:
 	@./tests/clean-tree-check.sh
 	@./tests/env-check.sh .env.example
 	@./tests/compose-static-check.sh
+	@./tests/backend-static-check.sh
 
 config:
 	@./scripts/require-env.sh
 	@docker compose --env-file .env -f compose.yml config --quiet
 
+build: config
+	@docker compose --env-file .env -f compose.yml build backend
+
+test: build
+	@docker compose --env-file .env -f compose.yml run --rm --no-deps \
+	  --entrypoint sh backend -c "pip install --no-cache-dir '.[test]' >/dev/null && pytest"
+
 up: config
-	@docker compose --env-file .env -f compose.yml up -d
+	@docker compose --env-file .env -f compose.yml up -d --build
 	@$(MAKE) wait
 
 wait:
 	@./scripts/wait-for-services.sh
+
+api-smoke:
+	@./scripts/api-smoke.sh
 
 down:
 	@docker compose --env-file .env -f compose.yml down

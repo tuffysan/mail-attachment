@@ -18,11 +18,15 @@ jobs:
       - name: Create test environment
         run: make init
       - name: Validate Compose
-        run: docker compose --env-file .env -f compose.yml config --quiet
-      - name: Start dependencies
+        run: make config
+      - name: Run backend tests
+        run: make test
+      - name: Start stack
         run: make up
+      - name: Verify health API
+        run: make api-smoke
       - name: Show status
         run: make ps
-      - name: Stop dependencies
+      - name: Stop stack
         if: always()
         run: docker compose --env-file .env -f compose.yml down --volumes
