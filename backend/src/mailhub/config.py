@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     app_name: str = "Mail Attachment Hub"
-    app_version: str = "0.5.0"
+    app_version: str = "0.7.0"
     log_level: str = "INFO"
     database_url: str = Field(
         default="postgresql+asyncpg://mailhub:mailhub@postgres:5432/mailhub",
@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     admin_email: str | None = None
     admin_password: str | None = Field(default=None, min_length=12, repr=False)
     admin_display_name: str = "Administrator"
+    imap_timeout_seconds: float = Field(default=15.0, ge=1.0, le=120.0)
 
 
 @lru_cache

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, clearToken, getCurrentUser, getReadiness } from '../api'
 import type { ReadyResponse, User } from '../types'
 
@@ -76,9 +76,10 @@ export function DashboardPage() {
         </section>
 
         <section className="coming-next">
-          <p className="eyebrow">Nästa steg</p>
-          <h2>E-postkonton och bilageregler</h2>
-          <p className="muted">Gränssnittet är nu redo för kommande funktioner för IMAP, OAuth och lagringsmål.</p>
+          <p className="eyebrow">E-post</p>
+          <h2>Anslut dina inkorgar</h2>
+          <p className="muted">Lägg till flera IMAP-konton, spara uppgifterna krypterat och testa anslutningen direkt.</p>
+          <Link className="button-link" to="/email-accounts">Hantera e-postkonton</Link>
         </section>
       </main>
     </div>

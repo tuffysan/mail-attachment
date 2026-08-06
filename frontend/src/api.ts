@@ -1,4 +1,4 @@
-import type { ReadyResponse, TokenResponse, User } from './types'
+import type { ConnectionTestResponse, EmailAccount, EmailAccountCreate, ReadyResponse, TokenResponse, User } from './types'
 
 const TOKEN_KEY = 'mailhub_access_token'
 
@@ -29,6 +29,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
     throw new ApiError(detail, response.status)
   }
+  if (response.status === 204) return undefined as T
   return (await response.json()) as T
 }
 
@@ -57,4 +58,24 @@ export function getCurrentUser(): Promise<User> {
 
 export function getReadiness(): Promise<ReadyResponse> {
   return request<ReadyResponse>('/health/ready')
+}
+
+
+export function listEmailAccounts(): Promise<EmailAccount[]> {
+  return request<EmailAccount[]>('/api/v1/email-accounts')
+}
+
+export function createEmailAccount(payload: EmailAccountCreate): Promise<EmailAccount> {
+  return request<EmailAccount>('/api/v1/email-accounts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteEmailAccount(id: string): Promise<void> {
+  return request<void>(`/api/v1/email-accounts/${id}`, { method: 'DELETE' })
+}
+
+export function testEmailAccount(id: string): Promise<ConnectionTestResponse> {
+  return request<ConnectionTestResponse>(`/api/v1/email-accounts/${id}/test`, { method: 'POST' })
 }

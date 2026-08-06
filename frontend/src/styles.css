@@ -41,3 +41,26 @@ button.secondary { margin: 0; background: #1e293b; border: 1px solid #334155; }
 .status-dot.ok { color: #4ade80; background: currentColor; } .status-dot.failed { color: #f87171; background: currentColor; }
 code { color: #bfdbfe; }
 @media (max-width: 640px) { .login-card { padding: 28px 22px; } .topbar { padding: 18px 20px; } .welcome-card,.section-heading { align-items: flex-start; flex-direction: column; } }
+
+.two-column { grid-template-columns: minmax(300px, 430px) minmax(0, 1fr); align-items: start; }
+.panel { border: 1px solid rgba(148,163,184,.18); border-radius: 22px; background: rgba(15,23,42,.76); padding: 28px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-row label { display: block; margin-bottom: 10px; }
+.checkbox-row { display: flex; align-items: center; gap: 10px; }
+.checkbox-row input { width: auto; }
+.success { padding: 12px 14px; border-radius: 12px; color: #bbf7d0; background: rgba(22,101,52,.35); border: 1px solid rgba(74,222,128,.3); margin-top: 8px; }
+.account-list { display: grid; gap: 14px; }
+.account-card { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 22px; border: 1px solid rgba(148,163,184,.16); border-radius: 18px; background: rgba(15,23,42,.64); }
+.account-card p { margin: 4px 0; }
+.account-title { display: flex; align-items: center; gap: 12px; }
+.account-title h3 { margin: 0; }
+.card-actions { display: flex; gap: 8px; }
+.card-actions button { margin: 0; }
+button.danger { background: #7f1d1d; }
+button.danger:hover { background: #991b1b; }
+.button-link { display: inline-flex; text-decoration: none; border-radius: 12px; padding: 13px 18px; color: white; background: #2563eb; font-weight: 800; margin-top: 16px; }
+.button-link.secondary { margin: 0; background: #1e293b; border: 1px solid #334155; }
+.empty-state { padding: 30px; text-align: center; border: 1px dashed #334155; border-radius: 18px; color: #94a3b8; }
+.small { font-size: .82rem; color: #94a3b8; }
+@media (max-width: 900px) { .two-column { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } .account-card { align-items: flex-start; flex-direction: column; } }

@@ -6,6 +6,7 @@ from fastapi import FastAPI, Response, status
 
 from mailhub import __version__
 from mailhub.api.auth import router as auth_router
+from mailhub.api.email_accounts import router as email_accounts_router
 from mailhub.auth.bootstrap import ensure_bootstrap_admin
 from mailhub.config import get_settings
 from mailhub.db import close_database, initialize_database
@@ -72,3 +73,4 @@ async def readiness(response: Response) -> dict[str, Any]:
 
 
 app.include_router(auth_router)
+app.include_router(email_accounts_router)

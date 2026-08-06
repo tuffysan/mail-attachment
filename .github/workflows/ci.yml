@@ -33,6 +33,8 @@ jobs:
         run: make auth-smoke
       - name: Verify frontend
         run: make frontend-smoke
+      - name: Verify email account API
+        run: make email-account-smoke
       - name: Show status
         run: make ps
       - name: Show logs on failure

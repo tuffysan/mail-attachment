@@ -4,21 +4,22 @@ Mail Attachment Hub is an open-source service for collecting email attachments a
 
 ## Current delivery
 
-**Sprint 0 · Step 006 — React login and dashboard**
+**Sprint 0 · Step 007 — multiple IMAP accounts and connection testing**
 
 The repository currently provides:
 
-- React 19 + TypeScript web interface
-- responsive login page and protected dashboard
-- FastAPI backend and JWT authentication
-- administrator bootstrap on first start
-- PostgreSQL 16, Redis 7 and SQLAlchemy 2
-- Alembic migrations
-- Nginx reverse proxy between the browser and backend
-- JSON logging and dependency-aware health checks
-- backend tests plus full-stack smoke checks in GitHub Actions
+- FastAPI backend and React web interface
+- local administrator login with JWT
+- PostgreSQL 16 and Redis 7
+- asynchronous SQLAlchemy and Alembic migrations
+- multiple encrypted IMAP email accounts
+- authenticated email-account CRUD API
+- IMAP mailbox connection testing
+- Swedish account-management interface
+- liveness and dependency-aware readiness endpoints
+- Docker Compose healthchecks and GitHub Actions CI
 
-Email accounts, attachment rules, OAuth, storage integrations, workers and Proxmox installation intentionally arrive in later steps.
+Gmail OAuth, mailbox polling, attachment extraction, routing rules, storage integrations and the Proxmox production installer arrive in later steps.
 
 ## Requirements
 
@@ -26,7 +27,7 @@ Email accounts, attachment rules, OAuth, storage integrations, workers and Proxm
 - Docker Engine with Docker Compose v2
 - GNU Make and Bash for convenience commands
 
-Windows users can run the commands through WSL 2 or Git Bash, or invoke Docker Compose directly.
+Windows users can use WSL 2 or Git Bash, or invoke Docker Compose directly.
 
 ## Start locally
 
@@ -39,11 +40,36 @@ make api-smoke
 make migration-smoke
 make auth-smoke
 make frontend-smoke
+make email-account-smoke
 ```
 
-The web interface is available at `http://127.0.0.1:3000`.
-The API and Swagger documentation are available at `http://127.0.0.1:8080/docs` in development mode.
+Open:
 
-`make init` writes generated administrator credentials to the local `.env` file. Do not commit `.env`.
+- Web UI: `http://127.0.0.1:3000`
+- API docs: `http://127.0.0.1:8080/docs`
 
-Read [STEP.md](STEP.md) for the scope and acceptance criteria of this delivery.
+The generated administrator credentials are written to the local `.env` file by `make init`. Never commit `.env`.
+
+## IMAP accounts
+
+After signing in, open **E-postkonton**. For Gmail with an app password use:
+
+- Server: `imap.gmail.com`
+- Port: `993`
+- SSL/TLS: enabled
+- Username: full Gmail address
+- Password: Google app password
+
+Native Gmail OAuth/XOAUTH2 is planned for the next OAuth delivery.
+
+## Common commands
+
+```bash
+make help
+make ps
+make logs
+make down
+make reset
+```
+
+Read `STEP.md` for the exact scope and acceptance criteria.
