@@ -1,23 +1,41 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# ============================================================
+# Mail Attachment Hub - Proxmox LXC installer
+# ============================================================
+#
+# One-liner:
+# bash -c "$(curl -fsSL https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh)"
+#
+# Optional:
+# CTID=134 MEMORY_MB=6144 CORES=4 DISK_GB=40 \
+# ADMIN_EMAIL=admin@example.com \
+# bash -c "$(curl -fsSL https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh)"
+#
+
 REPO="${REPO:-tuffysan/mail-attachment}"
 BRANCH="${BRANCH:-main}"
 
 CTID="${CTID:-}"
 HOSTNAME="${HOSTNAME:-mail-attachment-hub}"
+
 STORAGE="${STORAGE:-local-lvm}"
 TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-local}"
 BRIDGE="${BRIDGE:-vmbr0}"
+
 DISK_GB="${DISK_GB:-24}"
 MEMORY_MB="${MEMORY_MB:-4096}"
 SWAP_MB="${SWAP_MB:-512}"
 CORES="${CORES:-2}"
+
 UNPRIVILEGED="${UNPRIVILEGED:-1}"
+START_ON_BOOT="${START_ON_BOOT:-1}"
+
 IPV4="${IPV4:-dhcp}"
 GATEWAY="${GATEWAY:-}"
 DNS_SERVER="${DNS_SERVER:-}"
-START_ON_BOOT="${START_ON_BOOT:-1}"
+
 INSTALL_DIR="${INSTALL_DIR:-/opt/mail-attachment-hub}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
 TZ="${TZ:-Europe/Stockholm}"
@@ -43,7 +61,10 @@ on_error() {
   if [[ "$CREATED_CT" == "1" ]]; then
     echo >&2
     echo "LXC ${CTID} skapades men installationen slutfördes inte." >&2
-    echo "Ta bort den med:" >&2
+    echo "Du kan fortsätta felsöka i containern med:" >&2
+    echo "  pct enter ${CTID}" >&2
+    echo >&2
+    echo "Ta annars bort den med:" >&2
     echo "  pct stop ${CTID} 2>/dev/null || true" >&2
     echo "  pct destroy ${CTID} --purge" >&2
   fi
@@ -64,10 +85,12 @@ require_root() {
 }
 
 require_proxmox() {
+  local command_name
+
   for command_name in pct pvesh pveam pvesm; do
     command -v "$command_name" >/dev/null 2>&1 || {
       echo "${command_name} hittades inte." >&2
-      echo "Scriptet måste köras på en Proxmox VE-värd." >&2
+      echo "Scriptet måste köras direkt på en Proxmox VE-värd." >&2
       exit 1
     }
   done
@@ -132,7 +155,8 @@ create_container() {
   CURRENT_STEP="skapar LXC"
   log "Skapar LXC ${CTID}"
 
-  local network_config="name=eth0,bridge=${BRIDGE},ip=${IPV4}"
+  local network_config
+  network_config="name=eth0,bridge=${BRIDGE},ip=${IPV4}"
 
   if [[ -n "$GATEWAY" ]]; then
     network_config+=",gw=${GATEWAY}"
@@ -198,11 +222,11 @@ wait_for_network() {
   done
 
   echo "Containern fick inte fungerande nätverk eller DNS." >&2
-  echo "Kontrollera bridge, gateway och DNS-inställningar." >&2
+  echo "Kontrollera bridge, gateway och DNS." >&2
   exit 1
 }
 
-install_inside_container() {
+install_application() {
   CURRENT_STEP="installerar applikationen"
   log "Installerar Mail Attachment Hub i LXC ${CTID}"
 
@@ -350,9 +374,7 @@ case "$cmd" in
     docker compose --env-file .env -f compose.yml ps
     echo
 
-    API_PORT="$(
-      awk -F= "/^API_PORT=/ {print \$2}" "$CREDENTIAL_FILE"
-    )"
+    source "$CREDENTIAL_FILE"
 
     curl -fsS \
       "http://127.0.0.1:${API_PORT:-8080}/health/ready" |
@@ -367,29 +389,19 @@ case "$cmd" in
     ;;
 
   restart)
-    docker compose \
-      --env-file .env \
-      -f compose.yml \
-      restart
+    docker compose --env-file .env -f compose.yml restart
     ;;
 
   stop)
-    docker compose \
-      --env-file .env \
-      -f compose.yml \
-      down
+    docker compose --env-file .env -f compose.yml down
     ;;
 
   start)
-    docker compose \
-      --env-file .env \
-      -f compose.yml \
-      up -d
+    docker compose --env-file .env -f compose.yml up -d
     ;;
 
   update)
-    ./scripts/backup.sh
-
+    ./scripts/backup.sh || true
     git fetch origin main
     git pull --ff-only origin main
 
@@ -522,7 +534,7 @@ read_credential_value() {
 }
 
 show_result() {
-  CURRENT_STEP="slutför installation"
+  CURRENT_STEP="visar installationsinformation"
 
   local ip_address
   local admin_email
@@ -558,7 +570,7 @@ show_result() {
   echo "  E-post:       ${admin_email}"
   echo "  Lösenord:     ${admin_password}"
   echo
-  echo "Inloggningsuppgifterna är sparade i containern:"
+  echo "Inloggningsuppgifterna finns även i:"
   echo "  /root/mailhub-credentials.txt"
   echo
   echo "Öppna containern:"
@@ -587,7 +599,7 @@ main() {
   create_container
   wait_for_container
   wait_for_network
-  install_inside_container
+  install_application
   show_result
 }
 
