@@ -364,26 +364,72 @@ EOF
         -f compose.yml \
         up -d
 
-      for _ in $(seq 1 120); do
+      echo
+      echo "Väntar på backend och frontend..."
+
+      API_LIVE=0
+      FRONTEND_LIVE=0
+
+      for attempt in $(seq 1 60); do
         if curl -fsS \
-          "http://127.0.0.1:${API_PORT}/health/ready" \
+          "http://127.0.0.1:${API_PORT}/health/live" \
           >/dev/null 2>&1; then
+          API_LIVE=1
+        fi
+
+        if curl -fsS \
+          "http://127.0.0.1:${WEB_PORT}/" \
+          >/dev/null 2>&1; then
+          FRONTEND_LIVE=1
+        fi
+
+        printf "\rKontroll %02d/60 - API: %s - Frontend: %s" \
+          "$attempt" \
+          "$([[ "$API_LIVE" == "1" ]] && echo OK || echo väntar)" \
+          "$([[ "$FRONTEND_LIVE" == "1" ]] && echo OK || echo väntar)"
+
+        if [[ "$API_LIVE" == "1" && "$FRONTEND_LIVE" == "1" ]]; then
+          echo
           break
         fi
 
         sleep 2
       done
 
-      curl -fsS \
+      echo
+
+      if [[ "$API_LIVE" != "1" || "$FRONTEND_LIVE" != "1" ]]; then
+        echo "En eller flera webbtjänster svarar inte ännu." >&2
+        docker compose --env-file .env -f compose.yml ps >&2
+        docker compose --env-file .env -f compose.yml logs --tail=80 backend frontend >&2
+        exit 1
+      fi
+
+      echo "Backend live: OK"
+      echo "Frontend: OK"
+
+      if curl -fsS \
         "http://127.0.0.1:${API_PORT}/health/ready" \
-        >/dev/null
+        >/tmp/mailhub-readiness.json 2>/dev/null; then
+        echo "Backend readiness: OK"
+      else
+        echo "Backend readiness är tillfälligt degraderad; installationen fortsätter."
+        curl -sS \
+          "http://127.0.0.1:${API_PORT}/health/ready" \
+          >/tmp/mailhub-readiness.json 2>/dev/null || true
+      fi
 
-      curl -fsS \
-        "http://127.0.0.1:${WEB_PORT}" \
-        >/dev/null
+      if ! ss -lnt | grep -qE "0\.0\.0\.0:${WEB_PORT}|:::${WEB_PORT}"; then
+        echo "Frontend-port ${WEB_PORT} är inte exponerad på LXC-nätverket." >&2
+        ss -lnt >&2
+        exit 1
+      fi
 
-      ss -lnt | grep -q "0.0.0.0:${WEB_PORT}"
-      ss -lnt | grep -q "0.0.0.0:${API_PORT}"
+      if ! ss -lnt | grep -qE "0\.0\.0\.0:${API_PORT}|:::${API_PORT}"; then
+        echo "Backend-port ${API_PORT} är inte exponerad på LXC-nätverket." >&2
+        ss -lnt >&2
+        exit 1
+      fi
 
       cat > /usr/local/bin/mailhub <<'"'"'EOF'"'"'
 #!/usr/bin/env bash
