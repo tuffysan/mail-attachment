@@ -325,6 +325,25 @@ API_PORT=${API_PORT}
 EOF
 chmod 600 /root/mailhub-credentials.env
 
+# Credentials are a required installation artifact. Never allow a successful
+# installation without a readable admin email/password for the operator.
+test -s /root/mailhub-credentials.env || {
+  echo "Credentials file was not created." >&2
+  exit 1
+}
+
+grep -q '^ADMIN_EMAIL=.' /root/mailhub-credentials.env || {
+  echo "Admin email is missing from credentials file." >&2
+  exit 1
+}
+
+grep -q '^ADMIN_PASSWORD=.' /root/mailhub-credentials.env || {
+  echo "Admin password is missing from credentials file." >&2
+  exit 1
+}
+
+chmod 0600 /root/mailhub-credentials.env
+
 step "Bygger images"
 docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml build --pull
 
@@ -498,6 +517,21 @@ mailhub doctor
 step "Kör post-install-verifiering"
 mailhub verify
 
+echo
+echo "============================================================"
+echo " ADMIN LOGIN"
+echo "============================================================"
+# shellcheck disable=SC1091
+source /root/mailhub-credentials.env
+INSTALL_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+INSTALL_IP="${INSTALL_IP:-CONTAINER-IP}"
+echo "Web UI:         http://${INSTALL_IP}:${WEB_PORT}"
+echo "API:            http://${INSTALL_IP}:${API_PORT}"
+echo "Admin email:    ${ADMIN_EMAIL}"
+echo "Admin password: ${ADMIN_PASSWORD}"
+echo "============================================================"
+echo
+
 echo "COMPLETE" > /root/mailhub-install.status
 step "Installation klar"
 INNER
@@ -572,51 +606,61 @@ show_result() {
   CURRENT_STEP="visar installationsinformation"
   log "$CURRENT_STEP"
 
+  local ip email password web_port api_port
+
+  ip="$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}' || true)"
+  email="$(pct exec "$CTID" -- bash -lc "sed -n 's/^ADMIN_EMAIL=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" || true)"
+  password="$(pct exec "$CTID" -- bash -lc "sed -n 's/^ADMIN_PASSWORD=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" || true)"
+  web_port="$(pct exec "$CTID" -- bash -lc "sed -n 's/^WEB_PORT=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" || true)"
+  api_port="$(pct exec "$CTID" -- bash -lc "sed -n 's/^API_PORT=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" || true)"
+
+  ip="${ip:-unknown}"
+  web_port="${web_port:-$WEB_PORT}"
+  api_port="${api_port:-$API_PORT}"
+
+  if [[ -z "$email" || -z "$password" ]]; then
+    echo >&2
+    echo "============================================================" >&2
+    echo " INSTALLATION ERROR - ADMIN CREDENTIALS MISSING" >&2
+    echo "============================================================" >&2
+    echo "Installationen nådde COMPLETE men adminuppgifterna kunde inte läsas." >&2
+    echo "Kontrollera: /root/mailhub-credentials.env i LXC ${CTID}" >&2
+    echo >&2
+    pct exec "$CTID" -- bash -lc 'ls -l /root/mailhub-credentials.env /root/mailhub-install-info.txt 2>/dev/null || true' >&2 || true
+    exit 1
+  fi
+
   echo
   echo "============================================================"
   echo " Mail Attachment Hub installerades korrekt"
   echo "============================================================"
-  echo "LXC-ID: ${CTID}"
+  echo "LXC-ID:          ${CTID}"
+  echo "IP-adress:       ${ip}"
+  echo "Webbgränssnitt:  http://${ip}:${web_port}"
+  echo "API:             http://${ip}:${api_port}"
+  echo
+  echo "============================================================"
+  echo " ADMIN LOGIN"
+  echo "============================================================"
+  echo "Admin email:     ${email}"
+  echo "Admin password:  ${password}"
+  echo "============================================================"
   echo
 
-  local ip email password web_port api_port
-  ip="$(pct exec "$CTID" -- bash -lc "hostname -I 2>/dev/null | awk '{print \\$1}'" 2>/dev/null || true)"
-  email="$(pct exec "$CTID" -- bash -lc "sed -n 's/^ADMIN_EMAIL=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" 2>/dev/null || true)"
-  password="$(pct exec "$CTID" -- bash -lc "sed -n 's/^ADMIN_PASSWORD=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" 2>/dev/null || true)"
-  web_port="$(pct exec "$CTID" -- bash -lc "sed -n 's/^WEB_PORT=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" 2>/dev/null || true)"
-  api_port="$(pct exec "$CTID" -- bash -lc "sed -n 's/^API_PORT=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" 2>/dev/null || true)"
-
-  # Fallbacks if the credentials file is missing/incomplete.
-  [[ -n "$email" ]] || email="$(pct exec "$CTID" -- bash -lc "sed -n 's/^ADMIN_EMAIL=//p' /opt/mail-attachment-hub/.env 2>/dev/null | tail -1" 2>/dev/null || true)"
-  [[ -n "$password" ]] || password="$(pct exec "$CTID" -- bash -lc "sed -n 's/^ADMIN_PASSWORD=//p' /opt/mail-attachment-hub/.env 2>/dev/null | tail -1" 2>/dev/null || true)"
-  [[ -n "$web_port" ]] || web_port="${WEB_PORT}"
-  [[ -n "$api_port" ]] || api_port="${API_PORT}"
-
-  ip="${ip:-unknown}"
-  email="${email:-unknown}"
-  password="${password:-unknown}"
-
-  # Show the saved install summary when available, but credentials below are
-  # printed independently so a stale/missing summary can never hide them.
+  # Detailed information is useful, but credentials above are intentionally
+  # printed independently so a formatting/info-file regression cannot hide them.
   if pct exec "$CTID" -- test -s /root/mailhub-install-info.txt >/dev/null 2>&1; then
+    echo "Detaljer:"
     pct exec "$CTID" -- cat /root/mailhub-install-info.txt || true
     echo
   fi
 
-  echo "============================================================"
-  echo " ADMIN LOGIN"
-  echo "============================================================"
-  echo "Web UI:         http://${ip}:${web_port}"
-  echo "API:            http://${ip}:${api_port}"
-  echo "Admin email:    ${email}"
-  echo "Admin password: ${password}"
-  echo "============================================================"
-  echo
-  echo "Visa uppgifterna igen:"
+  echo "Visa adminuppgifter igen:"
   echo "  pct exec ${CTID} -- mailhub credentials"
   echo "  pct exec ${CTID} -- cat /root/mailhub-credentials.env"
   echo
-  echo "Doctor: pct exec ${CTID} -- mailhub doctor"
+  echo "Diagnos:"
+  echo "  pct exec ${CTID} -- mailhub doctor"
   echo "============================================================"
 }
 
