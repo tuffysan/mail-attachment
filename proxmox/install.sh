@@ -213,6 +213,11 @@ git clone --branch "$BRANCH" "https://github.com/${REPO}.git" "$INSTALL_DIR"
 
 cd "$INSTALL_DIR"
 
+# The installer intentionally chmods tracked shell scripts. Ignore file-mode
+# changes in this deployment checkout so they do not make Git appear dirty
+# and block post-install verification or future GitHub updates.
+git config core.fileMode false
+
 echo
 echo "============================================================"
 echo " Installing MailHub Update Agent"
@@ -343,6 +348,19 @@ grep -q '^ADMIN_PASSWORD=.' /root/mailhub-credentials.env || {
 }
 
 chmod 0600 /root/mailhub-credentials.env
+
+echo
+echo "============================================================"
+echo " ADMIN LOGIN - SAVE THESE CREDENTIALS"
+echo "============================================================"
+INSTALL_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+INSTALL_IP="${INSTALL_IP:-CONTAINER-IP}"
+echo "Web UI:         http://${INSTALL_IP}:${WEB_PORT}"
+echo "API:            http://${INSTALL_IP}:${API_PORT}"
+echo "Admin email:    ${ADMIN_EMAIL}"
+echo "Admin password: ${ADMIN_PASSWORD}"
+echo "============================================================"
+echo
 
 step "Bygger images"
 docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml build --pull
@@ -511,15 +529,9 @@ scripts/write-install-info.sh >/root/mailhub-install-info.txt.tmp
 mv -f /root/mailhub-install-info.txt.tmp /root/mailhub-install-info.txt
 chmod 0600 /root/mailhub-install-info.txt
 
-step "Kör slutlig systemkontroll"
-mailhub doctor
-
-step "Kör post-install-verifiering"
-mailhub verify
-
 echo
 echo "============================================================"
-echo " ADMIN LOGIN"
+echo " ADMIN LOGIN - INSTALLATION CREDENTIALS"
 echo "============================================================"
 # shellcheck disable=SC1091
 source /root/mailhub-credentials.env
@@ -531,6 +543,12 @@ echo "Admin email:    ${ADMIN_EMAIL}"
 echo "Admin password: ${ADMIN_PASSWORD}"
 echo "============================================================"
 echo
+
+step "Kör slutlig systemkontroll"
+mailhub doctor
+
+step "Kör post-install-verifiering"
+mailhub verify
 
 echo "COMPLETE" > /root/mailhub-install.status
 step "Installation klar"
@@ -559,6 +577,33 @@ start_install_job() {
   "
 }
 
+show_credentials_anyway() {
+  local ip email password web_port api_port
+
+  ip="$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}' || true)"
+  email="$(pct exec "$CTID" -- bash -lc "sed -n 's/^ADMIN_EMAIL=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" || true)"
+  password="$(pct exec "$CTID" -- bash -lc "sed -n 's/^ADMIN_PASSWORD=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" || true)"
+  web_port="$(pct exec "$CTID" -- bash -lc "sed -n 's/^WEB_PORT=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" || true)"
+  api_port="$(pct exec "$CTID" -- bash -lc "sed -n 's/^API_PORT=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" || true)"
+
+  [[ -n "$email" && -n "$password" ]] || return 0
+
+  ip="${ip:-unknown}"
+  web_port="${web_port:-$WEB_PORT}"
+  api_port="${api_port:-$API_PORT}"
+
+  echo
+  echo "============================================================"
+  echo " ADMIN LOGIN"
+  echo "============================================================"
+  echo "Web UI:         http://${ip}:${web_port}"
+  echo "API:            http://${ip}:${api_port}"
+  echo "Admin email:    ${email}"
+  echo "Admin password: ${password}"
+  echo "============================================================"
+  echo
+}
+
 monitor_install_job() {
   CURRENT_STEP="installerar applikationen"
   log "$CURRENT_STEP"
@@ -579,6 +624,7 @@ monitor_install_job() {
       echo
       echo "Installationstjänsten rapporterade fel: ${status}"
       pct exec "$CTID" -- tail -n 160 /root/mailhub-install.log
+      show_credentials_anyway
       exit 1
     fi
 
@@ -599,6 +645,7 @@ monitor_install_job() {
   echo
   echo "Installationen tog längre än 30 minuter."
   pct exec "$CTID" -- tail -n 160 /root/mailhub-install.log
+  show_credentials_anyway
   exit 1
 }
 

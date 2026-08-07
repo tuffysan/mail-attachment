@@ -24,6 +24,9 @@ API_PORT="${API_PORT:-8080}"
 
 VERSION="$(cat VERSION 2>/dev/null || echo unknown)"
 COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+
+# Installer-managed chmod operations must not count as source modifications.
+git config core.fileMode false 2>/dev/null || true
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 IP="${IP:-127.0.0.1}"
 
@@ -50,6 +53,7 @@ if git diff --quiet && git diff --cached --quiet; then
   pass "Git working tree clean"
 else
   fail "Git working tree contains local changes"
+  git status --short || true
 fi
 
 if docker compose --env-file .env "${COMPOSE[@]}" config >/dev/null; then
