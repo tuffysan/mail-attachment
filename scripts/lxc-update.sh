@@ -61,8 +61,10 @@ git reset --hard "${REMOTE}/${BRANCH}"
 log "Building updated images"
 docker compose --env-file .env "${COMPOSE[@]}" build --pull
 
-log "Preparing storage permissions"
-docker compose   --env-file .env   "${COMPOSE[@]}"   run --rm --no-deps storage-init
+log "Refreshing CLI"
+if [[ -f scripts/mailhub-cli.sh ]]; then
+  install -m 0755 scripts/mailhub-cli.sh /usr/local/bin/mailhub
+fi
 
 log "Starting updated stack"
 docker compose --env-file .env "${COMPOSE[@]}" up -d --remove-orphans
@@ -107,13 +109,16 @@ if [[ "$frontend_ok" != 1 ]]; then
   exit 1
 fi
 
-log "Checking storage permissions"
-chmod +x ./scripts/storage-self-test.sh
-./scripts/storage-self-test.sh
-
 docker image prune -f >/dev/null 2>&1 || true
 
 NEW_COMMIT="$(git rev-parse HEAD)"
+
+if [[ -x scripts/write-install-info.sh ]]; then
+  scripts/write-install-info.sh >/root/mailhub-install-info.txt.tmp
+  mv -f /root/mailhub-install-info.txt.tmp /root/mailhub-install-info.txt
+  chmod 0600 /root/mailhub-install-info.txt
+fi
+
 IP="$(hostname -I | awk '{print $1}')"
 
 echo

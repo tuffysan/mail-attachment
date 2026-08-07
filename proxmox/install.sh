@@ -221,9 +221,7 @@ echo "============================================================"
 for required_script in \
   scripts/install-update-agent.sh \
   scripts/update-agent.sh \
-  scripts/lxc-update.sh \
-  scripts/storage-self-test.sh \
-  scripts/repair-storage-permissions.sh
+  scripts/lxc-update.sh
 do
   if [[ ! -f "$required_script" ]]; then
     echo "Required update-agent file is missing: $required_script" >&2
@@ -234,9 +232,7 @@ done
 chmod +x \
   scripts/install-update-agent.sh \
   scripts/update-agent.sh \
-  scripts/lxc-update.sh \
-  scripts/storage-self-test.sh \
-  scripts/repair-storage-permissions.sh
+  scripts/lxc-update.sh
 
 echo "Running scripts/install-update-agent.sh..."
 ./scripts/install-update-agent.sh
@@ -315,9 +311,6 @@ chmod 600 /root/mailhub-credentials.env
 step "Bygger images"
 docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml build --pull
 
-step "Förbereder lagring"
-docker compose   --env-file .env   -f compose.yml   -f compose.override.lxc.yml   run --rm --no-deps storage-init
-
 step "Startar tjänster"
 docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml up -d
 
@@ -342,10 +335,6 @@ docker compose \
     rm -f /control/.mailhub-install-test
     echo "Update agent control directory: writable"
   '
-
-
-step "Verifierar lagringsrättigheter"
-./scripts/storage-self-test.sh
 
 
 step "Väntar på webbgränssnitt och API"
@@ -388,39 +377,20 @@ ss -lnt | grep -qE "0\.0\.0\.0:${API_PORT}|:::${API_PORT}" || {
 }
 
 step "Installerar mailhub-kommandot"
-cat > /usr/local/bin/mailhub <<'CLI'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-cd /opt/mail-attachment-hub
-source /root/mailhub-credentials.env
-IP="$(hostname -I | awk '{print $1}')"
+install -m 0755 scripts/mailhub-cli.sh /usr/local/bin/mailhub
 
-case "${1:-help}" in
-  status)
-    docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml ps
-    ;;
-  logs)
-    shift || true
-    docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml logs -f --tail=200 "$@"
-    ;;
-  credentials)
-    cat <<INFO
-============================================================
- Mail Attachment Hub
-============================================================
-Web UI:   http://${IP}:${WEB_PORT}
-API:      http://${IP}:${API_PORT}
-Login:    ${ADMIN_EMAIL}
-Password: ${ADMIN_PASSWORD}
-============================================================
-INFO
-    ;;
-  *)
-    echo "mailhub status | logs | credentials"
-    ;;
-esac
-CLI
-chmod +x /usr/local/bin/mailhub
+step "Sparar installationsinformation"
+chmod +x scripts/write-install-info.sh
+scripts/write-install-info.sh >/root/mailhub-install-info.txt.tmp
+mv -f /root/mailhub-install-info.txt.tmp /root/mailhub-install-info.txt
+chmod 0600 /root/mailhub-install-info.txt
+
+echo
+cat /root/mailhub-install-info.txt
+
+# Final doctor must pass before installation may be marked complete.
+step "Kör slutlig systemkontroll"
+mailhub doctor
 
 echo "COMPLETE" > /root/mailhub-install.status
 step "Installation klar"
@@ -496,29 +466,45 @@ show_result() {
   CURRENT_STEP="visar installationsinformation"
   log "$CURRENT_STEP"
 
-  local ip email password web_port api_port
-  ip="$(pct exec "$CTID" -- hostname -I | awk '{print $1}')"
-  email="$(pct exec "$CTID" -- sed -n 's/^ADMIN_EMAIL=//p' /root/mailhub-credentials.env)"
-  password="$(pct exec "$CTID" -- sed -n 's/^ADMIN_PASSWORD=//p' /root/mailhub-credentials.env)"
-  web_port="$(pct exec "$CTID" -- sed -n 's/^WEB_PORT=//p' /root/mailhub-credentials.env)"
-  api_port="$(pct exec "$CTID" -- sed -n 's/^API_PORT=//p' /root/mailhub-credentials.env)"
-
   echo
   echo "============================================================"
   echo " Mail Attachment Hub installerades korrekt"
   echo "============================================================"
-  echo "LXC-ID:   ${CTID}"
-  echo "IP:       ${ip}"
+  echo "LXC-ID: ${CTID}"
   echo
-  echo "Web UI:   http://${ip}:${web_port}"
-  echo "API:      http://${ip}:${api_port}"
-  echo
-  echo "Login:    ${email}"
-  echo "Password: ${password}"
+
+  # Prefer the already-generated, verified result file. Do not let a cosmetic
+  # final display failure turn a completed installation into a failed one.
+  if pct exec "$CTID" -- test -s /root/mailhub-install-info.txt >/dev/null 2>&1; then
+    pct exec "$CTID" -- cat /root/mailhub-install-info.txt || true
+  else
+    local ip="unknown"
+    local email="unknown"
+    local password="unknown"
+    local web_port="${WEB_PORT}"
+    local api_port="${API_PORT}"
+
+    ip="$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}' || true)"
+    email="$(pct exec "$CTID" -- sed -n 's/^ADMIN_EMAIL=//p' /root/mailhub-credentials.env 2>/dev/null || true)"
+    password="$(pct exec "$CTID" -- sed -n 's/^ADMIN_PASSWORD=//p' /root/mailhub-credentials.env 2>/dev/null || true)"
+
+    ip="${ip:-unknown}"
+    email="${email:-unknown}"
+    password="${password:-unknown}"
+
+    echo "IP:       ${ip}"
+    echo "Web UI:   http://${ip}:${web_port}"
+    echo "API:      http://${ip}:${api_port}"
+    echo "Login:    ${email}"
+    echo "Password: ${password}"
+  fi
+
   echo
   echo "Visa uppgifterna senare:"
-  echo "  pct enter ${CTID}"
-  echo "  mailhub credentials"
+  echo "  pct exec ${CTID} -- mailhub credentials"
+  echo
+  echo "Kör full diagnos:"
+  echo "  pct exec ${CTID} -- mailhub doctor"
   echo "============================================================"
 }
 
