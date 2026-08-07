@@ -12,11 +12,16 @@ class ImapTestResult:
     message_count: int | None = None
 
 
+def _oauth_auth_string(username: str, access_token: str) -> bytes:
+    return f"user={username}\x01auth=Bearer {access_token}\x01\x01".encode("utf-8")
+
+
 def _test_connection_sync(
     host: str,
     port: int,
     username: str,
-    password: str,
+    password: str | None,
+    access_token: str | None,
     mailbox: str,
     use_ssl: bool,
     timeout_seconds: float,
@@ -34,7 +39,16 @@ def _test_connection_sync(
         else:
             connection = imaplib.IMAP4(host=host, port=port, timeout=timeout_seconds)
 
-        connection.login(username, password)
+        if access_token:
+            connection.authenticate(
+                "XOAUTH2",
+                lambda _: _oauth_auth_string(username, access_token),
+            )
+        elif password:
+            connection.login(username, password)
+        else:
+            return ImapTestResult(False, "No usable IMAP credential is configured")
+
         status, data = connection.select(mailbox, readonly=True)
         if status != "OK":
             return ImapTestResult(False, f"Mailbox {mailbox!r} could not be opened")
@@ -56,7 +70,8 @@ async def test_imap_connection(
     host: str,
     port: int,
     username: str,
-    password: str,
+    password: str | None = None,
+    access_token: str | None = None,
     mailbox: str,
     use_ssl: bool,
     timeout_seconds: float,
@@ -67,6 +82,7 @@ async def test_imap_connection(
         port,
         username,
         password,
+        access_token,
         mailbox,
         use_ssl,
         timeout_seconds,

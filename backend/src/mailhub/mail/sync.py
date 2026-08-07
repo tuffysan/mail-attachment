@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
@@ -8,9 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from mailhub.config import Settings
 from mailhub.db.models import ActivityEvent, Attachment, EmailAccount, MailMessage, SyncRun
-from mailhub.mail.crypto import CredentialCipher
 from mailhub.mail.engine import ParsedAttachment, fetch_messages
-from mailhub.mail.oauth import refresh_access_token
+from mailhub.mail.credentials import resolve_mail_credential
 from mailhub.rules.router import route_attachment
 
 
@@ -19,27 +18,6 @@ async def activity(session: AsyncSession, event_type: str, message: str, account
         event_type=event_type, message=message, email_account_id=account_id,
         level=level, details_json=json.dumps(details) if details else None
     ))
-
-
-async def _credential(account: EmailAccount, settings: Settings, session: AsyncSession):
-    cipher = CredentialCipher(settings.app_secret_key)
-    if account.auth_type == "oauth":
-        if not account.encrypted_refresh_token:
-            raise ValueError("OAuth account has no refresh token")
-        now = datetime.now(UTC)
-        if account.encrypted_access_token and account.access_token_expires_at and account.access_token_expires_at > now + timedelta(minutes=2):
-            return None, cipher.decrypt(account.encrypted_access_token)
-        tokens = await refresh_access_token(
-            account.oauth_provider or "", cipher.decrypt(account.encrypted_refresh_token), settings, session
-        )
-        access = tokens["access_token"]
-        account.encrypted_access_token = cipher.encrypt(access)
-        account.access_token_expires_at = now + timedelta(seconds=int(tokens.get("expires_in", 3600)))
-        await session.flush()
-        return None, access
-    if not account.encrypted_password:
-        raise ValueError("Password account has no password")
-    return cipher.decrypt(account.encrypted_password), None
 
 
 async def sync_account(account_id: UUID, session: AsyncSession, settings: Settings, attempt: int = 1) -> SyncRun:
@@ -52,10 +30,10 @@ async def sync_account(account_id: UUID, session: AsyncSession, settings: Settin
     session.add(run)
     await session.commit()
     try:
-        password, access_token = await _credential(account, settings, session)
+        credential = await resolve_mail_credential(account, settings, session)
         messages = await fetch_messages(
             host=account.host, port=account.port, username=account.username,
-            password=password, access_token=access_token, mailbox=account.mailbox,
+            password=credential.password, access_token=credential.access_token, mailbox=account.mailbox,
             use_ssl=account.use_ssl, start_uid=account.last_uid,
             limit=settings.sync_batch_size, timeout=settings.imap_timeout_seconds,
             extract_zip=settings.extract_zip_attachments,

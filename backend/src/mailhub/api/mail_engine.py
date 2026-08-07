@@ -126,6 +126,15 @@ async def oauth_callback(
             )
         )
 
+        if existing is None and not refresh_token:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Google did not return a refresh token. Revoke the app grant "
+                    "for this Google account and connect again with consent."
+                ),
+            )
+
         account = existing or EmailAccount(
             name=f"Google - {email}",
             email_address=email,

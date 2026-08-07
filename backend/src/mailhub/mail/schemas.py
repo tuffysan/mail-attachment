@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class EmailAccountCreate(BaseModel):
@@ -37,6 +37,8 @@ class EmailAccountResponse(BaseModel):
     mailbox: str
     use_ssl: bool
     is_enabled: bool
+    auth_type: str
+    oauth_provider: str | None
     last_test_status: str | None
     last_test_message: str | None
     created_at: datetime
@@ -48,3 +50,12 @@ class ConnectionTestResponse(BaseModel):
     message: str
     mailbox: str
     message_count: int | None = None
+
+
+class EmailAccountConnectionTestRequest(BaseModel):
+    host: str = Field(min_length=1, max_length=255)
+    port: int = Field(default=993, ge=1, le=65535)
+    username: str = Field(min_length=1, max_length=320)
+    password: str = Field(min_length=1, max_length=1024)
+    mailbox: str = Field(default="INBOX", min_length=1, max_length=255)
+    use_ssl: bool = True
