@@ -1,4 +1,4 @@
-import type { ConnectionTestResponse, EmailAccount, EmailAccountCreate, ReadyResponse, TokenResponse, User } from './types'
+import type { ConnectionTestResponse, EmailAccount, EmailAccountConnectionTest, EmailAccountCreate, ReadyResponse, TokenResponse, User } from './types'
 
 const TOKEN_KEY = 'mailhub_access_token'
 
@@ -82,6 +82,15 @@ export function listEmailAccounts(): Promise<EmailAccount[]> {
 
 export function createEmailAccount(payload: EmailAccountCreate): Promise<EmailAccount> {
   return request<EmailAccount>('/api/v1/email-accounts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function validateEmailAccount(
+  payload: EmailAccountConnectionTest,
+): Promise<ConnectionTestResponse> {
+  return request<ConnectionTestResponse>('/api/v1/email-accounts/validate', {
     method: 'POST',
     body: JSON.stringify(payload),
   })

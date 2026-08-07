@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   ApiError,
   clearGoogleOAuthConfig,
@@ -28,7 +28,6 @@ function suggestedBaseUrl(): string {
 }
 
 export function GoogleOAuthSetupPage() {
-  const navigate = useNavigate()
   const [config, setConfig] = useState<GoogleOAuthConfig | null>(null)
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
@@ -153,9 +152,14 @@ export function GoogleOAuthSetupPage() {
 
   async function copyCallback() {
     if (!callbackUrl) return
-    await navigator.clipboard.writeText(callbackUrl)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1500)
+
+    try {
+      await navigator.clipboard.writeText(callbackUrl)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    } catch {
+      setError('Callback-URL kunde inte kopieras automatiskt. Markera och kopiera den manuellt.')
+    }
   }
 
   return (

@@ -170,3 +170,11 @@ select { width: 100%; border: 1px solid #334155; border-radius: 12px; padding: 1
     flex-direction: column;
   }
 }
+
+.form-actions {
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.form-actions button {
+  margin: 0;
+}

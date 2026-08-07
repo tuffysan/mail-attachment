@@ -51,7 +51,9 @@ export function AdminPage() {
 
   async function loadUpdateStatus() {
     try {
-      setUpdate(await getUpdateStatus())
+      const current = await getUpdateStatus()
+      setUpdate(current)
+      setUpdateError('')
     } catch (caught) {
       setUpdateError(
         caught instanceof ApiError
@@ -101,9 +103,6 @@ export function AdminPage() {
   useEffect(() => {
     void reload()
     void loadUpdateStatus()
-
-    // Check GitHub when the operations page is opened.
-    void checkUpdate()
 
     const dashboardTimer = window.setInterval(() => void reload(), 30000)
     const updateTimer = window.setInterval(() => void loadUpdateStatus(), 3000)
@@ -176,7 +175,11 @@ export function AdminPage() {
                       ? 'Fel'
                       : update?.state === 'unavailable'
                         ? 'Ej installerad'
-                        : 'Uppdaterad'}
+                        : update?.state === 'idle'
+                          ? 'Redo'
+                          : update?.state === 'success'
+                            ? 'Uppdaterad'
+                            : 'Uppdaterad'}
             </span>
           </div>
 
@@ -206,6 +209,13 @@ export function AdminPage() {
 
           {update?.message && (
             <p className="muted">{update.message}</p>
+          )}
+
+          {update?.state === 'unavailable' && (
+            <div className="alert">
+              Uppdateringsagenten kan inte nås. Kontrollera att LXC-agenten är
+              installerad och att backend kan läsa och skriva <code>/control</code>.
+            </div>
           )}
 
           {update?.state === 'updating' && (

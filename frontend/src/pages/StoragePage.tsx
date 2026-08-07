@@ -262,7 +262,11 @@ export function StoragePage() {
                     <h3>{destination.name}</h3>
                     <span
                       className={`status-pill ${
-                        destination.last_test_status === 'ok' ? 'ok' : 'pending'
+                        destination.last_test_status === 'ok'
+                          ? 'ok'
+                          : destination.last_test_status === 'failed'
+                            ? 'failed'
+                            : 'pending'
                       }`}
                     >
                       {destination.last_test_status === 'ok'
@@ -347,6 +351,10 @@ export function StoragePage() {
               <p>
                 <strong>Skrivbar:</strong>{' '}
                 {permissions?.writable ? 'Ja' : 'Nej'}
+              </p>
+              <p>
+                <strong>Körbar/traverserbar:</strong>{' '}
+                {permissions?.executable ? 'Ja' : 'Nej'}
               </p>
             </div>
 

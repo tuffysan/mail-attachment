@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ApiError,
   clearToken,
@@ -9,6 +9,7 @@ import {
   startOAuth,
   syncEmailAccount,
   testEmailAccount,
+  validateEmailAccount,
 } from '../api'
 import type { EmailAccount, EmailAccountCreate } from '../types'
 
@@ -26,11 +27,14 @@ const emptyForm: EmailAccountCreate = {
 
 export function EmailAccountsPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [accounts, setAccounts] = useState<EmailAccount[]>([])
   const [form, setForm] = useState<EmailAccountCreate>(emptyForm)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const [validating, setValidating] = useState(false)
+  const [validated, setValidated] = useState(false)
   const [activeAccountId, setActiveAccountId] = useState('')
 
   async function reload() {
@@ -49,7 +53,52 @@ export function EmailAccountsPage() {
 
   useEffect(() => {
     void reload()
+
+    const oauth = searchParams.get('oauth')
+    if (oauth === 'google-connected') {
+      setNotice('Google-kontot anslöts och sparades.')
+      setSearchParams({}, { replace: true })
+    } else if (oauth === 'connected') {
+      setNotice('OAuth-kontot anslöts.')
+      setSearchParams({}, { replace: true })
+    }
   }, [])
+
+  function updateForm(patch: Partial<EmailAccountCreate>) {
+    setValidated(false)
+    setForm((current) => ({ ...current, ...patch }))
+  }
+
+  async function validateBeforeSave() {
+    setValidating(true)
+    setError('')
+    setNotice('')
+    setValidated(false)
+
+    try {
+      const result = await validateEmailAccount({
+        host: form.host,
+        port: form.port,
+        username: form.username,
+        password: form.password,
+        mailbox: form.mailbox,
+        use_ssl: form.use_ssl,
+      })
+      setValidated(true)
+      setNotice(
+        `IMAP-anslutningen fungerar. ${result.message_count ?? 0} ` +
+          `meddelanden i ${result.mailbox}.`,
+      )
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'IMAP-inställningarna kunde inte verifieras.',
+      )
+    } finally {
+      setValidating(false)
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -60,7 +109,8 @@ export function EmailAccountsPage() {
     try {
       await createEmailAccount(form)
       setForm(emptyForm)
-      setNotice('Kontot sparades. Testa anslutningen innan det används.')
+      setValidated(false)
+      setNotice('Kontot sparades.')
       await reload()
     } catch (caught) {
       setError(
@@ -225,7 +275,7 @@ export function EmailAccountsPage() {
               required
               value={form.name}
               onChange={(event) =>
-                setForm({ ...form, name: event.target.value })
+                updateForm({ name: event.target.value })
               }
               placeholder="Fakturor"
             />
@@ -237,8 +287,7 @@ export function EmailAccountsPage() {
               required
               value={form.email_address}
               onChange={(event) =>
-                setForm({
-                  ...form,
+                updateForm({
                   email_address: event.target.value,
                   username: form.username || event.target.value,
                 })
@@ -251,7 +300,7 @@ export function EmailAccountsPage() {
               required
               value={form.host}
               onChange={(event) =>
-                setForm({ ...form, host: event.target.value })
+                updateForm({ host: event.target.value })
               }
             />
 
@@ -266,10 +315,7 @@ export function EmailAccountsPage() {
                   required
                   value={form.port}
                   onChange={(event) =>
-                    setForm({
-                      ...form,
-                      port: Number(event.target.value),
-                    })
+                    updateForm({ port: Number(event.target.value) })
                   }
                 />
               </div>
@@ -281,10 +327,7 @@ export function EmailAccountsPage() {
                   required
                   value={form.mailbox}
                   onChange={(event) =>
-                    setForm({
-                      ...form,
-                      mailbox: event.target.value,
-                    })
+                    updateForm({ mailbox: event.target.value })
                   }
                 />
               </div>
@@ -296,10 +339,7 @@ export function EmailAccountsPage() {
               required
               value={form.username}
               onChange={(event) =>
-                setForm({
-                  ...form,
-                  username: event.target.value,
-                })
+                updateForm({ username: event.target.value })
               }
             />
 
@@ -310,10 +350,7 @@ export function EmailAccountsPage() {
               required
               value={form.password}
               onChange={(event) =>
-                setForm({
-                  ...form,
-                  password: event.target.value,
-                })
+                updateForm({ password: event.target.value })
               }
             />
 
@@ -322,18 +359,26 @@ export function EmailAccountsPage() {
                 type="checkbox"
                 checked={form.use_ssl}
                 onChange={(event) =>
-                  setForm({
-                    ...form,
-                    use_ssl: event.target.checked,
-                  })
+                  updateForm({ use_ssl: event.target.checked })
                 }
               />
               Använd SSL/TLS
             </label>
 
-            <button disabled={busy}>
-              {busy ? 'Sparar…' : 'Spara konto'}
-            </button>
+            <div className="card-actions form-actions">
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy || validating}
+                onClick={() => void validateBeforeSave()}
+              >
+                {validating ? 'Testar…' : 'Testa inställningar'}
+              </button>
+
+              <button disabled={busy || validating}>
+                {busy ? 'Sparar…' : validated ? 'Spara verifierat konto' : 'Spara konto'}
+              </button>
+            </div>
           </form>
         </section>
 
@@ -373,7 +418,9 @@ export function EmailAccountsPage() {
 
                     <p>{account.email_address}</p>
                     <p className="muted">
-                      {account.host}:{account.port} · {account.mailbox}
+                      {account.auth_type === 'oauth'
+                        ? `${account.oauth_provider ?? 'OAuth'} · ${account.mailbox}`
+                        : `${account.host}:${account.port} · ${account.mailbox}`}
                     </p>
 
                     {account.last_test_message && (
