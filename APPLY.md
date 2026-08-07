@@ -1,36 +1,40 @@
-# Apply Web Update Manager
+# Fix frontend build after local-storage permissions update
 
-Copy the overlay over the repository.
+This overlay restores the missing frontend exports used by `StoragePage.tsx`.
 
-## Commit
+## Copy to repository
 
 ```powershell
-git add backend frontend scripts compose.yml docs/WEB_UPDATES.md
-git commit -m "feat(operations): add web-based LXC updates"
+$Source = "C:\Temp\mail-attachment-hub-storage-frontend-build-fix"
+$Repo   = "C:\Git\mail-attachment"
+
+Get-ChildItem $Source -Force |
+  Where-Object { $_.Name -ne "APPLY.md" } |
+  Copy-Item -Destination $Repo -Recurse -Force
+
+Set-Location $Repo
+
+git add frontend/src/api.ts frontend/src/types.ts frontend/src/pages/StoragePage.tsx
+git commit -m "fix(frontend): restore local storage permission exports"
 git push origin main
 ```
 
-## One-time activation on an existing LXC
-
-The web update feature cannot update itself before the host-side agent has been
-installed. Run this once:
+## Existing LXC
 
 ```bash
 pct enter 134
-
 cd /opt/mail-attachment-hub
 git pull --ff-only origin main
-
-chmod +x scripts/install-update-agent.sh scripts/update-agent.sh scripts/lxc-update.sh
-./scripts/install-update-agent.sh
 
 docker compose \
   --env-file .env \
   -f compose.yml \
   -f compose.override.lxc.yml \
-  up -d --build
+  build frontend
+
+docker compose \
+  --env-file .env \
+  -f compose.yml \
+  -f compose.override.lxc.yml \
+  up -d frontend
 ```
-
-Reload the browser with Ctrl+F5 and open the Operations Dashboard.
-
-From then on, future GitHub changes can be installed from the web interface.

@@ -191,3 +191,16 @@ export interface UpdateStatus {
   finished_at: string | null
   message: string | null
 }
+
+
+export interface LocalStoragePermissions {
+  path: string
+  exists: boolean
+  uid: number | null
+  gid: number | null
+  owner: string | null
+  group: string | null
+  mode: string | null
+  writable: boolean
+  executable: boolean
+}

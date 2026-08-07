@@ -217,3 +217,23 @@ export function applyUpdate() {
     method: 'POST',
   })
 }
+
+
+export function getLocalStoragePermissions(id: string) {
+  return request<import('./types').LocalStoragePermissions>(
+    `/api/v1/storage/destinations/${id}/permissions`
+  )
+}
+
+export function updateLocalStoragePermissions(
+  id: string,
+  payload: { mode: string; recursive: boolean },
+) {
+  return request<import('./types').LocalStoragePermissions>(
+    `/api/v1/storage/destinations/${id}/permissions`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+  )
+}
