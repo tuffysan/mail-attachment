@@ -12,6 +12,7 @@ REMOTE="${REMOTE:-origin}"
 
 mkdir -p "$CONTROL_DIR"
 touch "$LOG_FILE"
+chown 10001:10001 "$LOG_FILE" 2>/dev/null || true
 chmod 0660 "$LOG_FILE" || true
 
 exec 9>"$LOCK_FILE"
@@ -50,24 +51,45 @@ json_status() {
     --argjson available "$available" \
     '{
       state: $state,
-      installed_commit: ($current | select(length > 0)),
-      latest_commit: ($latest | select(length > 0)),
+      installed_commit:
+        (if ($current | length) > 0 then $current else null end),
+      latest_commit:
+        (if ($latest | length) > 0 then $latest else null end),
       update_available: $available,
-      latest_message: ($latest_message | select(length > 0)),
-      latest_date: ($latest_date | select(length > 0)),
+      latest_message:
+        (if ($latest_message | length) > 0 then $latest_message else null end),
+      latest_date:
+        (if ($latest_date | length) > 0 then $latest_date else null end),
       checked_at: $checked_at,
-      started_at: ($started | select(length > 0)),
-      finished_at: ($finished | select(length > 0)),
-      message: ($message | select(length > 0))
+      started_at:
+        (if ($started | length) > 0 then $started else null end),
+      finished_at:
+        (if ($finished | length) > 0 then $finished else null end),
+      message:
+        (if ($message | length) > 0 then $message else null end)
     }' > "$tmp"
 
-  chmod 0660 "$tmp"
+  if [[ ! -s "$tmp" ]]; then
+    echo "Generated update status JSON is empty." >&2
+    rm -f "$tmp"
+    return 1
+  fi
+
+  if ! jq -e . "$tmp" >/dev/null 2>&1; then
+    echo "Generated update status JSON is invalid." >&2
+    cat "$tmp" >&2 || true
+    rm -f "$tmp"
+    return 1
+  fi
+
   chown 10001:10001 "$tmp" 2>/dev/null || true
-  mv "$tmp" "$STATUS_FILE"
+  chmod 0660 "$tmp"
+  mv -f "$tmp" "$STATUS_FILE"
 }
 
 get_versions() {
   cd "$APP_DIR"
+
   git fetch "$REMOTE" "$BRANCH" >>"$LOG_FILE" 2>&1
 
   CURRENT_COMMIT="$(git rev-parse HEAD)"
@@ -84,48 +106,72 @@ get_versions() {
 
 case "$ACTION" in
   check)
-    json_status "checking" false "" "" "Kontrollerar GitHub."
+    json_status \
+      "checking" false \
+      "" "" \
+      "Kontrollerar GitHub."
+
     if get_versions; then
       if [[ "$UPDATE_AVAILABLE" == "true" ]]; then
         json_status \
           "update_available" true \
-          "$CURRENT_COMMIT" "$LATEST_COMMIT" \
+          "$CURRENT_COMMIT" \
+          "$LATEST_COMMIT" \
           "En ny version finns på GitHub." \
-          "$LATEST_MESSAGE" "$LATEST_DATE"
+          "$LATEST_MESSAGE" \
+          "$LATEST_DATE"
       else
         json_status \
           "up_to_date" false \
-          "$CURRENT_COMMIT" "$LATEST_COMMIT" \
+          "$CURRENT_COMMIT" \
+          "$LATEST_COMMIT" \
           "Installationen är uppdaterad." \
-          "$LATEST_MESSAGE" "$LATEST_DATE"
+          "$LATEST_MESSAGE" \
+          "$LATEST_DATE"
       fi
     else
-      json_status "error" false "" "" "Kunde inte kontrollera GitHub."
+      json_status \
+        "error" false \
+        "" "" \
+        "Kunde inte kontrollera GitHub."
       exit 1
     fi
     ;;
 
   update)
     STARTED="$(date --iso-8601=seconds)"
+
     if ! get_versions; then
-      json_status "error" false "" "" "Kunde inte läsa GitHub före uppdatering." "" "" "$STARTED"
+      json_status \
+        "error" false \
+        "" "" \
+        "Kunde inte läsa GitHub före uppdatering." \
+        "" "" \
+        "$STARTED"
       exit 1
     fi
 
     if [[ "$UPDATE_AVAILABLE" != "true" ]]; then
       json_status \
         "up_to_date" false \
-        "$CURRENT_COMMIT" "$LATEST_COMMIT" \
+        "$CURRENT_COMMIT" \
+        "$LATEST_COMMIT" \
         "Installationen är redan uppdaterad." \
-        "$LATEST_MESSAGE" "$LATEST_DATE" "$STARTED" "$(date --iso-8601=seconds)"
+        "$LATEST_MESSAGE" \
+        "$LATEST_DATE" \
+        "$STARTED" \
+        "$(date --iso-8601=seconds)"
       exit 0
     fi
 
     json_status \
       "updating" true \
-      "$CURRENT_COMMIT" "$LATEST_COMMIT" \
+      "$CURRENT_COMMIT" \
+      "$LATEST_COMMIT" \
       "Uppdatering pågår. Webbgränssnittet kan startas om." \
-      "$LATEST_MESSAGE" "$LATEST_DATE" "$STARTED"
+      "$LATEST_MESSAGE" \
+      "$LATEST_DATE" \
+      "$STARTED"
 
     {
       echo
@@ -135,29 +181,41 @@ case "$ACTION" in
     } >>"$LOG_FILE" 2>&1 || {
       json_status \
         "error" true \
-        "$CURRENT_COMMIT" "$LATEST_COMMIT" \
+        "$CURRENT_COMMIT" \
+        "$LATEST_COMMIT" \
         "Uppdateringen misslyckades. Se /var/lib/mailhub-control/update.log." \
-        "$LATEST_MESSAGE" "$LATEST_DATE" "$STARTED" "$(date --iso-8601=seconds)"
+        "$LATEST_MESSAGE" \
+        "$LATEST_DATE" \
+        "$STARTED" \
+        "$(date --iso-8601=seconds)"
       exit 1
     }
 
-    # Source code may have changed during the update.
     cd "$APP_DIR"
     NEW_COMMIT="$(git rev-parse HEAD)"
+
     git fetch "$REMOTE" "$BRANCH" >>"$LOG_FILE" 2>&1 || true
+
     NEW_LATEST="$(git rev-parse "${REMOTE}/${BRANCH}" 2>/dev/null || echo "$NEW_COMMIT")"
     NEW_MESSAGE="$(git log -1 --format=%s "${REMOTE}/${BRANCH}" 2>/dev/null || true)"
     NEW_DATE="$(git log -1 --format=%cI "${REMOTE}/${BRANCH}" 2>/dev/null || true)"
 
     json_status \
       "success" false \
-      "$NEW_COMMIT" "$NEW_LATEST" \
+      "$NEW_COMMIT" \
+      "$NEW_LATEST" \
       "Uppdateringen slutfördes." \
-      "$NEW_MESSAGE" "$NEW_DATE" "$STARTED" "$(date --iso-8601=seconds)"
+      "$NEW_MESSAGE" \
+      "$NEW_DATE" \
+      "$STARTED" \
+      "$(date --iso-8601=seconds)"
     ;;
 
   *)
-    json_status "error" false "" "" "Okänd uppdateringsbegäran."
+    json_status \
+      "error" false \
+      "" "" \
+      "Okänd uppdateringsbegäran."
     exit 1
     ;;
 esac

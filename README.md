@@ -1,65 +1,61 @@
-# Mail Attachment Hub v1.0.0
+# Fix for zero-byte status.json
 
-Open-source email attachment automation with multiple email accounts, advanced rules and multiple storage destinations.
+Your diagnostics show:
 
-## Features
-
-- Gmail, Microsoft 365 and standard IMAP
-- multiple email accounts
-- scheduled and manual mailbox synchronization
-- secure attachment extraction and ZIP limits
-- advanced rule engine with simulation
-- multiple storage destinations per rule
-- Google Drive, OneDrive, Dropbox, S3, MinIO, Azure Blob, WebDAV, Nextcloud, SFTP, SMB and local storage
-- encrypted credentials and tokens
-- React web interface and FastAPI
-- PostgreSQL, Redis, Docker Compose
-- audit logs, administration statistics and API-key foundation
-- backup, restore, diagnostics and upgrades
-- Docker and Proxmox installation
-
-## Docker one-line installation
-
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/tuffysan/mail-attachment/main/install.sh)"
+```text
+/control is readable: READ_OK
+/control is writable: WRITE_OK
+status.json size: 0 bytes
 ```
 
-## Proxmox LXC one-line installation
+This means the problem is not permissions. The update agent wrote an empty
+status file.
 
-Run as root on a Proxmox host:
+The fixed `update-agent.sh` always emits valid JSON and converts empty optional
+fields to JSON `null`. It also refuses to replace `status.json` if the generated
+temporary file is empty or invalid.
 
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/tuffysan/mail-attachment/main/installer/proxmox/install.sh)"
+## Apply
+
+Copy:
+
+```text
+scripts/update-agent.sh
+scripts/repair-update-status.sh
 ```
 
-## Development
+to the repository.
 
-```bash
-make init
-make check
-make test
-make up
+Commit:
+
+```powershell
+git add scripts/update-agent.sh scripts/repair-update-status.sh
+git update-index --chmod=+x scripts/update-agent.sh
+git update-index --chmod=+x scripts/repair-update-status.sh
+git commit -m "fix(update): prevent zero-byte status json"
+git push origin main
 ```
 
-Web UI: `http://127.0.0.1:3000`
-
-## Production HTTPS
-
-Set `DOMAIN` and `LETSENCRYPT_EMAIL` in `.env`, then:
+## Repair existing LXC
 
 ```bash
-make production-up
+pct enter 134
+
+cd /opt/mail-attachment-hub
+git pull --ff-only origin main
+
+chmod +x scripts/repair-update-status.sh
+./scripts/repair-update-status.sh
 ```
 
-## Operations
+The result should show a non-empty `status.json` and state either:
 
-```bash
-make doctor
-make backup
-./scripts/restore.sh backups/<backup-directory>
-./scripts/update.sh
+```text
+up_to_date
 ```
 
-## Important
+or:
 
-A full clean-install and provider-by-provider end-to-end test must be run in your own Docker/Proxmox environment before exposing the application publicly.
+```text
+update_available
+```
