@@ -301,6 +301,7 @@ APP_SECRET_KEY="$(openssl rand -hex 48)"
 ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '\n' | tr '/+' '_-')"
 
 replace_env POSTGRES_PASSWORD "$POSTGRES_PASSWORD"
+replace_env APP_ENV "production"
 replace_env APP_SECRET_KEY "$APP_SECRET_KEY"
 replace_env ADMIN_EMAIL "$ADMIN_EMAIL"
 replace_env ADMIN_PASSWORD "$ADMIN_PASSWORD"
@@ -520,11 +521,11 @@ monitor_install_job() {
   log "$CURRENT_STEP"
 
   local last_lines=""
-  for attempt in $(seq 1 300); do
+  for attempt in $(seq 1 900); do
     local status
     status="$(pct exec "$CTID" -- bash -lc 'cat /root/mailhub-install.status 2>/dev/null || echo STARTING')"
 
-    printf "\rStatus: %-12s  Kontroll %03d/300" "$status" "$attempt"
+    printf "\rStatus: %-12s  Kontroll %03d/900" "$status" "$attempt"
 
     if [[ "$status" == "COMPLETE" ]]; then
       echo
@@ -553,7 +554,7 @@ monitor_install_job() {
   done
 
   echo
-  echo "Installationen tog längre än 10 minuter."
+  echo "Installationen tog längre än 30 minuter."
   pct exec "$CTID" -- tail -n 160 /root/mailhub-install.log
   exit 1
 }

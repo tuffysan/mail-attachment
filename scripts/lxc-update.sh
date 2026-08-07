@@ -6,6 +6,16 @@ BRANCH="${BRANCH:-main}"
 REMOTE="${REMOTE:-origin}"
 COMPOSE=(-f compose.yml -f compose.override.lxc.yml)
 
+CREDENTIALS_FILE="${CREDENTIALS_FILE:-/root/mailhub-credentials.env}"
+if [[ -f "$CREDENTIALS_FILE" ]]; then
+  # shellcheck disable=SC1090
+  source "$CREDENTIALS_FILE"
+fi
+WEB_PORT="${WEB_PORT:-$(sed -n 's/^FRONTEND_PORT=//p' .env 2>/dev/null | tail -1)}"
+API_PORT="${API_PORT:-$(sed -n 's/^BACKEND_PORT=//p' .env 2>/dev/null | tail -1)}"
+WEB_PORT="${WEB_PORT:-3000}"
+API_PORT="${API_PORT:-8080}"
+
 log() {
   printf '\n[%(%H:%M:%S)T] %s\n' -1 "$*"
 }
@@ -88,7 +98,7 @@ docker compose --env-file .env "${COMPOSE[@]}" up -d --remove-orphans
 log "Checking backend"
 backend_ok=0
 for attempt in $(seq 1 60); do
-  if curl -fsS http://127.0.0.1:8080/health/live >/dev/null 2>&1; then
+  if curl -fsS http://127.0.0.1:${API_PORT}/health/live >/dev/null 2>&1; then
     backend_ok=1
     break
   fi
@@ -108,7 +118,7 @@ fi
 log "Checking frontend"
 frontend_ok=0
 for attempt in $(seq 1 30); do
-  if curl -fsS http://127.0.0.1:3000/ >/dev/null 2>&1; then
+  if curl -fsS http://127.0.0.1:${WEB_PORT}/ >/dev/null 2>&1; then
     frontend_ok=1
     break
   fi
@@ -146,8 +156,8 @@ echo "============================================================"
 echo "Previous: ${CURRENT_COMMIT}"
 echo "Current:  ${NEW_COMMIT}"
 echo
-echo "Web UI:   http://${IP}:3000"
-echo "API:      http://${IP}:8080"
+echo "Web UI:   http://${IP}:${WEB_PORT}"
+echo "API:      http://${IP}:${API_PORT}"
 echo
 echo "Rollback: mailhub rollback ${CURRENT_COMMIT}"
 echo "============================================================"
