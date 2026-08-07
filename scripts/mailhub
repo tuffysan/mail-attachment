@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+APP_DIR="${APP_DIR:-/opt/mail-attachment-hub}"
+CREDENTIAL_FILE="/root/mailhub-credentials.env"
+
+cd "$APP_DIR"
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  status)
+    docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml ps
+    echo
+    curl -sS http://127.0.0.1:8080/health/ready | jq . || true
+    ;;
+  logs)
+    docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml logs -f --tail=200 "$@"
+    ;;
+  start)
+    docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml up -d
+    ;;
+  stop)
+    docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml down
+    ;;
+  restart)
+    docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml restart
+    ;;
+  update)
+    exec "$APP_DIR/scripts/lxc-update.sh" "$@"
+    ;;
+  rollback)
+    exec "$APP_DIR/scripts/lxc-rollback.sh" "$@"
+    ;;
+  credentials)
+    [[ -f "$CREDENTIAL_FILE" ]] || { echo "Credential file not found."; exit 1; }
+    source "$CREDENTIAL_FILE"
+    IP="$(hostname -I | awk '{print $1}')"
+    cat <<INFO
+============================================================
+ Mail Attachment Hub
+============================================================
+Web UI:   http://${IP}:${WEB_PORT:-3000}
+API:      http://${IP}:${API_PORT:-8080}
+Login:    ${ADMIN_EMAIL}
+Password: ${ADMIN_PASSWORD}
+============================================================
+INFO
+    ;;
+  version)
+    echo "Commit: $(git rev-parse HEAD)"
+    git describe --tags --always 2>/dev/null || true
+    ;;
+  *)
+    cat <<HELP
+Mail Attachment Hub CLI
+
+mailhub status
+mailhub logs [service]
+mailhub start
+mailhub stop
+mailhub restart
+mailhub update
+mailhub rollback <git-commit>
+mailhub credentials
+mailhub version
+HELP
+    ;;
+esac

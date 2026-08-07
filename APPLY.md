@@ -1,34 +1,20 @@
-# Dashboard health fix
+# Apply LXC update support
 
-This overlay fixes a frontend bug where `/health/ready` returning HTTP 503
-for a degraded dependency was incorrectly treated as a backend connection
-failure.
-
-## Copy
+Copy the files over the repository, then commit:
 
 ```powershell
-$Source = "C:\Temp\mail-attachment-hub-dashboard-health-fix"
-$Repo   = "C:\Git\mail-attachment"
-
-Get-ChildItem $Source -Force |
-  Where-Object { $_.Name -ne "APPLY.md" } |
-  Copy-Item -Destination $Repo -Recurse -Force
-
-Set-Location $Repo
-git add frontend/src/api.ts frontend/src/pages/DashboardPage.tsx
-git commit -m "fix(frontend): render degraded backend readiness"
+git add scripts docs/LXC_UPDATES.md
+git commit -m "feat(installer): add LXC update and rollback commands"
 git push origin main
 ```
 
-## Update existing LXC
+For an existing LXC:
 
 ```bash
-pct exec 134 -- bash -lc '
+pct enter 134
 cd /opt/mail-attachment-hub
 git pull --ff-only origin main
-docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml build frontend
-docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml up -d frontend
-'
+chmod +x scripts/install-lxc-cli.sh
+./scripts/install-lxc-cli.sh
+mailhub update
 ```
-
-Then reload the web page with Ctrl+F5.
