@@ -30,7 +30,7 @@ async def _credential(account: EmailAccount, settings: Settings, session: AsyncS
         if account.encrypted_access_token and account.access_token_expires_at and account.access_token_expires_at > now + timedelta(minutes=2):
             return None, cipher.decrypt(account.encrypted_access_token)
         tokens = await refresh_access_token(
-            account.oauth_provider or "", cipher.decrypt(account.encrypted_refresh_token), settings
+            account.oauth_provider or "", cipher.decrypt(account.encrypted_refresh_token), settings, session
         )
         access = tokens["access_token"]
         account.encrypted_access_token = cipher.encrypt(access)

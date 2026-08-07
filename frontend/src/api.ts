@@ -237,3 +237,30 @@ export function updateLocalStoragePermissions(
     },
   )
 }
+
+
+export function getGoogleOAuthConfig() {
+  return request<import('./types').GoogleOAuthConfig>(
+    '/api/v1/admin/oauth/google'
+  )
+}
+
+export function saveGoogleOAuthConfig(payload: {
+  client_id: string
+  client_secret?: string | null
+  public_base_url: string
+}) {
+  return request<import('./types').GoogleOAuthConfig>(
+    '/api/v1/admin/oauth/google',
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+  )
+}
+
+export function clearGoogleOAuthConfig() {
+  return request<void>('/api/v1/admin/oauth/google', {
+    method: 'DELETE',
+  })
+}

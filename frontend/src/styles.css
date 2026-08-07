@@ -122,59 +122,51 @@ select { width: 100%; border: 1px solid #334155; border-radius: 12px; padding: 1
 @media (max-width:640px) { .operations-summary { align-items:flex-start; flex-direction:column; } }
 
 
-.software-update-panel {
-  display: grid;
-  gap: 18px;
+.google-oauth-layout {
+  gap: 22px;
 }
-.update-version-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+.google-oauth-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
 }
-.update-version-grid > div {
-  display: grid;
-  gap: 5px;
-  padding: 14px;
-  border: 1px solid rgba(148,163,184,.16);
-  border-radius: 14px;
-  background: rgba(2,6,23,.28);
-}
-.update-version-grid span {
-  color: #94a3b8;
-  font-size: .78rem;
-}
-.update-version-grid strong {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-.update-commit-message {
-  margin: 0;
-}
-.update-progress {
+.google-link-grid {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.google-oauth-warning {
+  margin-bottom: 18px;
+}
+.copy-field {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+.copy-field code {
+  flex: 1;
+  display: flex;
   align-items: center;
-  padding: 14px;
-  border-radius: 14px;
-  background: rgba(30,64,175,.18);
-  border: 1px solid rgba(96,165,250,.3);
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: rgba(2, 6, 23, .45);
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
-.update-progress > span {
-  width: 12px;
-  height: 12px;
-  flex: 0 0 12px;
-  border: 2px solid #60a5fa;
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: update-spin .8s linear infinite;
-}
-.update-progress p {
+.copy-field button {
   margin: 0;
-}
-@keyframes update-spin {
-  to { transform: rotate(360deg); }
+  white-space: nowrap;
 }
 @media (max-width: 700px) {
-  .update-version-grid {
-    grid-template-columns: 1fr;
+  .google-oauth-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .copy-field {
+    flex-direction: column;
   }
 }

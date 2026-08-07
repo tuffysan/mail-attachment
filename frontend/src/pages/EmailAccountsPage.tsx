@@ -81,6 +81,15 @@ export function EmailAccountsPage() {
       const result = await startOAuth(provider)
       window.location.href = result.authorization_url
     } catch (caught) {
+      if (
+        provider === 'google' &&
+        caught instanceof ApiError &&
+        caught.message.includes('Google OAuth is not configured')
+      ) {
+        navigate('/admin/google-oauth')
+        return
+      }
+
       setError(
         caught instanceof ApiError
           ? caught.message

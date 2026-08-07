@@ -204,3 +204,15 @@ export interface LocalStoragePermissions {
   writable: boolean
   executable: boolean
 }
+
+
+export interface GoogleOAuthConfig {
+  configured: boolean
+  client_id: string | null
+  client_secret_configured: boolean
+  public_base_url: string | null
+  redirect_uri: string | null
+  google_auth_overview_url: string
+  google_clients_url: string
+  gmail_api_url: string
+}

@@ -1,14 +1,20 @@
-# Apply Web Update Agent permission fix
+# Apply Google OAuth Web Setup
 
-Copy all files over the repository.
+Copy this overlay over the repository.
+
+## Commit
 
 ```powershell
-git add scripts compose.yml proxmox/install.sh docs/WEB_UPDATE_AGENT_REPAIR.md
-git commit -m "fix(update): make LXC update control directory writable"
+git add backend frontend docs/GOOGLE_OAUTH_SETUP.md
+git commit -m "feat(oauth): configure Google OAuth from web interface"
 git push origin main
 ```
 
-## Repair existing LXC 134
+## Update existing LXC
+
+If web updates are working, use the Operations Dashboard.
+
+Otherwise:
 
 ```bash
 pct enter 134
@@ -16,14 +22,19 @@ pct enter 134
 cd /opt/mail-attachment-hub
 git pull --ff-only origin main
 
-chmod +x scripts/repair-update-agent.sh
-./scripts/repair-update-agent.sh
+docker compose \
+  --env-file .env \
+  -f compose.yml \
+  -f compose.override.lxc.yml \
+  up -d --build
 ```
 
-Reload the browser with Ctrl+F5 and open:
+Reload the browser with Ctrl+F5.
+
+Then open:
 
 ```text
-Administration -> Operations Dashboard -> GitHub-uppdatering
+E-postkonton -> Anslut Gmail med Google
 ```
 
-Click **Kontrollera GitHub**.
+If OAuth is not configured, the browser opens the Google OAuth setup page.

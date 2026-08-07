@@ -8,6 +8,7 @@ import { StoragePage } from './pages/StoragePage'
 import { AdminPage } from './pages/AdminPage'
 import { SetupWizardPage } from './pages/SetupWizardPage'
 import { SetupGuard } from './components/SetupGuard'
+import { GoogleOAuthSetupPage } from './pages/GoogleOAuthSetupPage'
 
 export function App() {
   return (
@@ -20,6 +21,7 @@ export function App() {
         <Route path="/rules" element={<ProtectedRoute><SetupGuard><RulesPage /></SetupGuard></ProtectedRoute>} />
         <Route path="/storage" element={<ProtectedRoute><SetupGuard><StoragePage /></SetupGuard></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><SetupGuard><AdminPage /></SetupGuard></ProtectedRoute>} />
+        <Route path="/admin/google-oauth" element={<ProtectedRoute><SetupGuard><GoogleOAuthSetupPage /></SetupGuard></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
