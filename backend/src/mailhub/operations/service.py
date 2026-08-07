@@ -15,15 +15,19 @@ from mailhub.db.models import (
     SyncRun,
 )
 from mailhub.health import run_readiness_checks
+from mailhub.maintenance_control import read_backups, read_maintenance_status
 from mailhub.operations.schemas import (
     OperationsActivity,
+    OperationsBackupSummary,
     OperationsCounts,
     OperationsDashboardResponse,
     OperationsFailure,
+    OperationsRecentSync,
     OperationsHealthCheck,
     OperationsWorker,
     StorageHealthItem,
 )
+from mailhub.operations.system_resources import collect_system_resources
 
 
 async def _count(session: AsyncSession, model, *criteria) -> int:
@@ -151,6 +155,90 @@ async def build_operations_dashboard(
     recent_failures.sort(key=lambda item: item.created_at, reverse=True)
     recent_failures = recent_failures[:20]
 
+
+    recent_sync_rows = (
+        await session.execute(
+            select(SyncRun, EmailAccount)
+            .join(
+                EmailAccount,
+                EmailAccount.id == SyncRun.email_account_id,
+            )
+            .order_by(desc(SyncRun.started_at))
+            .limit(12)
+        )
+    ).all()
+    recent_syncs = [
+        OperationsRecentSync(
+            id=str(sync_run.id),
+            email_account_id=str(sync_run.email_account_id),
+            account_name=account.name,
+            email_address=account.email_address,
+            status=sync_run.status,
+            started_at=sync_run.started_at,
+            finished_at=sync_run.finished_at,
+            messages_seen=sync_run.messages_seen,
+            messages_created=sync_run.messages_created,
+            attachments_created=sync_run.attachments_created,
+            error_message=sync_run.error_message,
+        )
+        for sync_run, account in recent_sync_rows
+    ]
+
+    backup_rows = read_backups()
+    maintenance = read_maintenance_status()
+
+    def backup_created(item):
+        value = item.get("created_at")
+        if not value:
+            return datetime.min.replace(tzinfo=UTC)
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            return (
+                parsed.replace(tzinfo=UTC)
+                if parsed.tzinfo is None
+                else parsed.astimezone(UTC)
+            )
+        except ValueError:
+            return datetime.min.replace(tzinfo=UTC)
+
+    sorted_backups = sorted(
+        backup_rows,
+        key=backup_created,
+        reverse=True,
+    )
+    latest_backup = sorted_backups[0] if sorted_backups else None
+    latest_created_at = (
+        backup_created(latest_backup)
+        if latest_backup and latest_backup.get("created_at")
+        else None
+    )
+    backup_summary = OperationsBackupSummary(
+        count=len(sorted_backups),
+        latest_id=(
+            str(latest_backup.get("id"))
+            if latest_backup
+            else None
+        ),
+        latest_created_at=latest_created_at,
+        latest_size_bytes=(
+            int(latest_backup.get("size_bytes") or 0)
+            if latest_backup
+            else 0
+        ),
+        total_size_bytes=sum(
+            int(item.get("size_bytes") or 0)
+            for item in sorted_backups
+        ),
+        status=str(maintenance.get("state") or "idle"),
+        message=(
+            str(maintenance.get("message"))
+            if maintenance.get("message")
+            else None
+        ),
+    )
+
+    system = collect_system_resources()
+
     workers = [
         OperationsWorker(
             name=item.name,
@@ -179,6 +267,9 @@ async def build_operations_dashboard(
         or counts.failed_routes > 0
         or counts.failed_storage_destinations > 0
         or any(item.state == "failed" for item in workers)
+        or system.memory_used_percent >= 95
+        or system.disk_used_percent >= 95
+        or backup_summary.status == "error"
     )
 
     return OperationsDashboardResponse(
@@ -190,4 +281,7 @@ async def build_operations_dashboard(
         storage=storage,
         recent_activity=recent_activity,
         recent_failures=recent_failures,
+        recent_syncs=recent_syncs,
+        system=system,
+        backups=backup_summary,
     )

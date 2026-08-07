@@ -180,6 +180,41 @@ export interface OperationsDashboard {
     detail: string
     created_at: string
   }>
+  recent_syncs: Array<{
+    id: string
+    email_account_id: string
+    account_name: string
+    email_address: string
+    status: string
+    started_at: string
+    finished_at: string | null
+    messages_seen: number
+    messages_created: number
+    attachments_created: number
+    error_message: string | null
+  }>
+  system: {
+    cpu_count: number
+    load_1m: number | null
+    load_5m: number | null
+    load_15m: number | null
+    memory_total_bytes: number
+    memory_available_bytes: number
+    memory_used_percent: number
+    disk_total_bytes: number
+    disk_free_bytes: number
+    disk_used_percent: number
+    uptime_seconds: number | null
+  }
+  backups: {
+    count: number
+    latest_id: string | null
+    latest_created_at: string | null
+    latest_size_bytes: number
+    total_size_bytes: number
+    status: string
+    message: string | null
+  }
 }
 
 

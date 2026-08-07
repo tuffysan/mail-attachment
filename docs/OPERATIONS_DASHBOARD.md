@@ -1,34 +1,57 @@
-# Operations Dashboard
+# Operations Dashboard – Part 5C
 
-The Operations Dashboard is available to administrators at `/admin`.
+Part 5C expands the administrator Operations Dashboard with runtime resource
+information and operational history.
 
-It aggregates existing application data without adding a database migration.
+## New system metrics
 
-## Dashboard sections
+The backend reports:
 
-- account, message and attachment counters;
-- successful, pending and failed routing executions;
-- PostgreSQL, Redis and attachment-storage health;
-- process-local worker heartbeat and cycle state;
-- configured storage destinations and their latest connection test;
-- latest activity events;
-- latest synchronization and routing failures.
+- CPU count
+- 1, 5 and 15 minute load averages
+- RAM total / available / used percentage
+- disk total / free / used percentage
+- uptime
 
-The frontend refreshes automatically every 30 seconds and also provides a
-manual refresh button.
+No additional Python dependency is required. Linux `/proc`, `os.getloadavg()`
+and `shutil.disk_usage()` are used.
 
-## API
+## Backup summary
+
+The Operations Dashboard reads the same maintenance control files introduced in
+Part 5B and shows:
+
+- number of backups
+- latest backup identifier
+- latest backup date
+- latest backup size
+- total backup size
+- current backup/restore agent state
+
+The detailed Backup & Restore page remains available under:
 
 ```text
-GET /api/v1/operations/dashboard
+/admin/backups
 ```
 
-The endpoint requires an authenticated administrator account.
+## Recent syncs
 
-## Worker visibility
+The dashboard now shows the latest synchronization runs together with:
 
-Worker state is currently process-local. When API and mail worker run in
-separate containers, the API may not display the worker container's registry.
-Sync runs and activity events are persisted and still appear in the
-operations data. Redis-based cross-process heartbeat remains a future
-enhancement.
+- account name
+- email address
+- status
+- messages created
+- attachments created
+- error details
+- start time
+
+## Degraded state
+
+The Operations Dashboard now also becomes degraded when:
+
+- RAM usage is 95% or higher
+- disk usage is 95% or higher
+- the backup/restore agent is in an error state
+
+This is in addition to the existing health, routing, storage and worker checks.

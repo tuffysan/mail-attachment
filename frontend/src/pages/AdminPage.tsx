@@ -17,6 +17,35 @@ function formatDate(value: string | null): string {
   }).format(new Date(value))
 }
 
+
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0 B'
+
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let size = value
+  let unit = 0
+
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024
+    unit += 1
+  }
+
+  return `${size >= 10 || unit === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`
+}
+
+function formatUptime(value: number | null | undefined): string {
+  if (value === null || value === undefined || value < 0) return 'Okänd'
+
+  const seconds = Math.floor(value)
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+
+  if (days > 0) return `${days} d ${hours} h`
+  if (hours > 0) return `${hours} h ${minutes} min`
+  return `${minutes} min`
+}
+
 function label(name: string): string {
   return name.replaceAll('_', ' ')
 }
@@ -330,6 +359,115 @@ export function AdminPage() {
           ))}
         </section>
 
+
+        {dashboard && (
+          <section className="panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">LXC-resurser</p>
+                <h2>Systemresurser</h2>
+              </div>
+              <span
+                className={`status-pill ${
+                  dashboard.system.memory_used_percent >= 95 ||
+                  dashboard.system.disk_used_percent >= 95
+                    ? 'failed'
+                    : dashboard.system.memory_used_percent >= 85 ||
+                        dashboard.system.disk_used_percent >= 85
+                      ? 'pending'
+                      : 'ok'
+                }`}
+              >
+                {dashboard.system.disk_used_percent >= 95
+                  ? 'Disk kritisk'
+                  : dashboard.system.memory_used_percent >= 95
+                    ? 'RAM kritiskt'
+                    : 'OK'}
+              </span>
+            </div>
+
+            <div className="resource-grid">
+              <article className="resource-card">
+                <span>CPU / Load</span>
+                <strong>
+                  {dashboard.system.load_1m ?? '–'}
+                </strong>
+                <small>
+                  {dashboard.system.cpu_count} CPU · 5m {dashboard.system.load_5m ?? '–'} ·
+                  15m {dashboard.system.load_15m ?? '–'}
+                </small>
+              </article>
+
+              <article className="resource-card">
+                <span>RAM</span>
+                <strong>{dashboard.system.memory_used_percent}%</strong>
+                <small>
+                  {formatBytes(
+                    dashboard.system.memory_total_bytes -
+                      dashboard.system.memory_available_bytes,
+                  )}{' '}
+                  av {formatBytes(dashboard.system.memory_total_bytes)}
+                </small>
+              </article>
+
+              <article className="resource-card">
+                <span>Disk</span>
+                <strong>{dashboard.system.disk_used_percent}%</strong>
+                <small>
+                  {formatBytes(
+                    dashboard.system.disk_total_bytes -
+                      dashboard.system.disk_free_bytes,
+                  )}{' '}
+                  av {formatBytes(dashboard.system.disk_total_bytes)}
+                </small>
+              </article>
+
+              <article className="resource-card">
+                <span>Uptime</span>
+                <strong>{formatUptime(dashboard.system.uptime_seconds)}</strong>
+                <small>LXC/processmiljö</small>
+              </article>
+            </div>
+          </section>
+        )}
+
+        {dashboard && (
+          <section className="panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Backup</p>
+                <h2>Backupstatus</h2>
+              </div>
+              <Link className="button-link secondary" to="/admin/backups">
+                Hantera backup
+              </Link>
+            </div>
+
+            <div className="backup-summary-grid">
+              <div>
+                <span>Antal</span>
+                <strong>{dashboard.backups.count}</strong>
+              </div>
+              <div>
+                <span>Senaste</span>
+                <strong>{dashboard.backups.latest_id ?? 'Ingen backup'}</strong>
+              </div>
+              <div>
+                <span>Senaste datum</span>
+                <strong>{formatDate(dashboard.backups.latest_created_at)}</strong>
+              </div>
+              <div>
+                <span>Total storlek</span>
+                <strong>{formatBytes(dashboard.backups.total_size_bytes)}</strong>
+              </div>
+            </div>
+
+            {dashboard.backups.message && (
+              <p className="muted">{dashboard.backups.message}</p>
+            )}
+          </section>
+        )}
+
         <div className="operations-columns">
           <section className="panel">
             <div className="section-heading">
@@ -398,6 +536,57 @@ export function AdminPage() {
             </div>
           </section>
         </div>
+
+        <section className="panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Synkronisering</p>
+              <h2>Senaste körningar</h2>
+            </div>
+            <Link className="button-link secondary" to="/email-accounts">
+              Hantera konton
+            </Link>
+          </div>
+
+          <div className="operations-table sync-table">
+            <div className="operations-table-head">
+              <span>Konto</span>
+              <span>Status</span>
+              <span>Resultat</span>
+              <span>Start</span>
+            </div>
+
+            {dashboard?.recent_syncs.length ? (
+              dashboard.recent_syncs.map(sync => (
+                <div className="operations-table-row" key={sync.id}>
+                  <span>
+                    <strong>{sync.account_name}</strong>
+                    <small>{sync.email_address}</small>
+                  </span>
+                  <span
+                    className={`status-text ${
+                      sync.status === 'failed' ? 'failed' : 'ok'
+                    }`}
+                  >
+                    {sync.status}
+                  </span>
+                  <span>
+                    {sync.messages_created} meddelanden ·{' '}
+                    {sync.attachments_created} bilagor
+                    {sync.error_message && (
+                      <small className="sync-error">{sync.error_message}</small>
+                    )}
+                  </span>
+                  <span>{formatDate(sync.started_at)}</span>
+                </div>
+              ))
+            ) : (
+              <div className="empty-state">
+                Ingen synkroniseringshistorik finns ännu.
+              </div>
+            )}
+          </div>
+        </section>
 
         <section className="panel">
           <div className="section-heading">
