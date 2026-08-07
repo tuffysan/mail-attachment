@@ -10,6 +10,44 @@ LOCK_FILE="${CONTROL_DIR}/update.lock"
 BRANCH="${BRANCH:-main}"
 REMOTE="${REMOTE:-origin}"
 
+write_emergency_status() {
+  local code="$1"
+  local message="$2"
+  local tmp="${STATUS_FILE}.emergency.tmp"
+
+  jq -n \
+    --arg message "$message" \
+    --arg checked_at "$(date --iso-8601=seconds)" \
+    --argjson code "$code" \
+    '{
+      state: "error",
+      installed_commit: null,
+      latest_commit: null,
+      update_available: false,
+      latest_message: null,
+      latest_date: null,
+      checked_at: $checked_at,
+      started_at: null,
+      finished_at: $checked_at,
+      message: ($message + " (exit " + ($code | tostring) + ")")
+    }' > "$tmp" 2>/dev/null || return 0
+
+  if [[ -s "$tmp" ]] && jq -e . "$tmp" >/dev/null 2>&1; then
+    chown 10001:10001 "$tmp" 2>/dev/null || true
+    chmod 0660 "$tmp" 2>/dev/null || true
+    mv -f "$tmp" "$STATUS_FILE" 2>/dev/null || true
+  else
+    rm -f "$tmp"
+  fi
+}
+
+agent_failure() {
+  local code=$?
+  write_emergency_status "$code" "Update-agenten avbröts oväntat."
+  exit "$code"
+}
+trap agent_failure ERR
+
 mkdir -p "$CONTROL_DIR"
 touch "$LOG_FILE"
 chown 10001:10001 "$LOG_FILE" 2>/dev/null || true
@@ -22,7 +60,13 @@ fi
 
 [[ -f "$REQUEST_FILE" ]] || exit 0
 
-ACTION="$(jq -r '.action // empty' "$REQUEST_FILE" 2>/dev/null || true)"
+if ! jq -e . "$REQUEST_FILE" >/dev/null 2>&1; then
+  rm -f "$REQUEST_FILE"
+  write_emergency_status 2 "Uppdateringsbegäran innehöll ogiltig JSON."
+  exit 2
+fi
+
+ACTION="$(jq -r '.action // empty' "$REQUEST_FILE")"
 rm -f "$REQUEST_FILE"
 
 json_status() {
