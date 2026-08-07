@@ -1,41 +1,25 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-
 APP_DIR="${APP_DIR:-/opt/mail-attachment-hub}"
-TARGET_COMMIT="${1:-}"
+BACKUP_ROOT="${BACKUP_ROOT:-/root/mailhub-update-backups}"
 COMPOSE=(-f compose.yml -f compose.override.lxc.yml)
-
-[[ $EUID -eq 0 ]] || { echo "Run as root inside the LXC."; exit 1; }
-[[ -n "$TARGET_COMMIT" ]] || { echo "Usage: mailhub rollback <git-commit>"; exit 1; }
-
+[[ $EUID -eq 0 ]] || { echo "Kör som root inne i LXC:n."; exit 1; }
 cd "$APP_DIR"
-
-git cat-file -e "${TARGET_COMMIT}^{commit}" 2>/dev/null || {
-  echo "Commit '${TARGET_COMMIT}' does not exist locally."
-  exit 1
-}
-
-if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Local changes detected. Rollback aborted."
-  git status --short
-  exit 1
-fi
-
-echo "Rolling back to ${TARGET_COMMIT}..."
-git reset --hard "$TARGET_COMMIT"
-
+TARGET="${1:-latest}"
+if [[ "$TARGET" == latest ]]; then BACKUP_DIR="$(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk 'NR==1 {print $2}')"; elif [[ -d "$TARGET" ]]; then BACKUP_DIR="$TARGET"; elif [[ -d "$BACKUP_ROOT/$TARGET" ]]; then BACKUP_DIR="$BACKUP_ROOT/$TARGET"; else BACKUP_DIR=""; fi
+[[ -n "$BACKUP_DIR" && -d "$BACKUP_DIR" ]] || { echo "Ingen rollback-backup hittades: $TARGET" >&2; exit 1; }
+[[ -s "$BACKUP_DIR/previous-commit.txt" ]] || { echo "previous-commit.txt saknas." >&2; exit 1; }
+PREVIOUS_COMMIT="$(tr -d '\r\n' < "$BACKUP_DIR/previous-commit.txt")"
+git cat-file -e "${PREVIOUS_COMMIT}^{commit}" 2>/dev/null || git fetch --all --prune
+git cat-file -e "${PREVIOUS_COMMIT}^{commit}" 2>/dev/null || { echo "Commit saknas: $PREVIOUS_COMMIT" >&2; exit 1; }
+[[ ! -f "$BACKUP_DIR/.env" ]] || cp "$BACKUP_DIR/.env" .env
+chmod 0600 .env
+git reset --hard "$PREVIOUS_COMMIT"
+docker compose --env-file .env "${COMPOSE[@]}" run --rm --no-deps storage-init
 docker compose --env-file .env "${COMPOSE[@]}" build
 docker compose --env-file .env "${COMPOSE[@]}" up -d --remove-orphans
-
-for attempt in $(seq 1 60); do
-  if curl -fsS http://127.0.0.1:8080/health/live >/dev/null 2>&1; then
-    echo "Rollback completed successfully."
-    exit 0
-  fi
-  printf "\rBackend %02d/60" "$attempt"
-  sleep 2
-done
-echo
-
-echo "Rollback completed, but backend health check did not pass."
-exit 1
+for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8080/health/live >/dev/null 2>&1 && break; [[ $i == 60 ]] && exit 1; sleep 2; done
+for i in $(seq 1 30); do curl -fsS http://127.0.0.1:3000/ >/dev/null 2>&1 && break; [[ $i == 30 ]] && exit 1; sleep 2; done
+[[ ! -x scripts/storage-self-test.sh ]] || scripts/storage-self-test.sh
+if [[ -x scripts/write-install-info.sh ]]; then scripts/write-install-info.sh >/root/mailhub-install-info.txt.tmp; mv -f /root/mailhub-install-info.txt.tmp /root/mailhub-install-info.txt; chmod 0600 /root/mailhub-install-info.txt; fi
+echo "Rollback slutförd. Commit: $(git rev-parse HEAD)"

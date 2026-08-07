@@ -183,6 +183,12 @@ Kommandon:
   mailhub repair update-agent
       Reparera GitHub update-agent.
 
+  mailhub backups
+      Lista rollback-punkter.
+
+  mailhub rollback [latest|backup-id|path]
+      Återställ en pre-update backup.
+
   mailhub update-status
       Visa aktuell update-agent JSON.
 
@@ -220,6 +226,19 @@ case "${1:-help}" in
   update)
     chmod +x scripts/lxc-update.sh
     exec scripts/lxc-update.sh
+    ;;
+
+  backups)
+    BACKUP_ROOT="/root/mailhub-update-backups"
+    [[ -d "$BACKUP_ROOT" ]] || { echo "Inga rollback-backuper finns."; exit 0; }
+    printf '%-20s %-12s %-12s %s\n' "BACKUP" "FROM" "TO" "CREATED"
+    while IFS= read -r dir; do from="$(cut -c1-10 "$dir/previous-commit.txt" 2>/dev/null || echo '-')"; to="$(cut -c1-10 "$dir/target-commit.txt" 2>/dev/null || echo '-')"; created="$(cat "$dir/created-at.txt" 2>/dev/null || basename "$dir")"; printf '%-20s %-12s %-12s %s\n' "$(basename "$dir")" "$from" "$to" "$created"; done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d | sort -r)
+    ;;
+
+  rollback)
+    shift || true
+    chmod +x scripts/lxc-rollback.sh
+    exec scripts/lxc-rollback.sh "${1:-latest}"
     ;;
 
   update-status)

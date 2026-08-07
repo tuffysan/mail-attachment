@@ -48,6 +48,8 @@ mailhub status
 mailhub doctor
 mailhub logs backend
 mailhub update
+mailhub backups
+mailhub rollback latest
 mailhub repair storage
 mailhub repair update-agent
 ============================================================

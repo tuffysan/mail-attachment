@@ -10,7 +10,21 @@ log() {
   printf '\n[%(%H:%M:%S)T] %s\n' -1 "$*"
 }
 
-trap 'code=$?; echo "Update failed with exit code ${code}." >&2; exit "$code"' ERR
+ROLLBACK_READY=0
+ROLLBACK_RUNNING=0
+BACKUP_DIR=""
+on_update_error() {
+  local code=$?
+  echo "Update failed with exit code ${code}." >&2
+  if [[ "$ROLLBACK_RUNNING" == 0 && "$ROLLBACK_READY" == 1 && -n "$BACKUP_DIR" && -x ./scripts/lxc-rollback.sh ]]; then
+    echo "Automatic rollback starting..." >&2
+    ROLLBACK_RUNNING=1
+    trap - ERR
+    ./scripts/lxc-rollback.sh "$BACKUP_DIR" || echo "Automatic rollback failed." >&2
+  fi
+  exit "$code"
+}
+trap on_update_error ERR
 
 [[ $EUID -eq 0 ]] || { echo "Run as root inside the LXC."; exit 1; }
 
@@ -45,15 +59,16 @@ fi
 log "Creating pre-update backup"
 BACKUP_DIR="/root/mailhub-update-backups/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$BACKUP_DIR"
+chmod 0700 "$BACKUP_DIR"
 cp .env "$BACKUP_DIR/.env"
+chmod 0600 "$BACKUP_DIR/.env"
 printf '%s\n' "$CURRENT_COMMIT" > "$BACKUP_DIR/previous-commit.txt"
+printf '%s\n' "$TARGET_COMMIT" > "$BACKUP_DIR/target-commit.txt"
+printf '%s\n' "$(date --iso-8601=seconds)" > "$BACKUP_DIR/created-at.txt"
+if [[ -x "./scripts/backup.sh" ]]; then ./scripts/backup.sh "$BACKUP_DIR/application-backup"; fi
+ROLLBACK_READY=1
 
-if [[ -x "./scripts/backup.sh" ]]; then
-  ./scripts/backup.sh || {
-    echo "Application backup failed. Update aborted."
-    exit 1
-  }
-fi
+chmod +x ./scripts/lxc-rollback.sh
 
 log "Updating source"
 git reset --hard "${REMOTE}/${BRANCH}"
@@ -61,10 +76,11 @@ git reset --hard "${REMOTE}/${BRANCH}"
 log "Building updated images"
 docker compose --env-file .env "${COMPOSE[@]}" build --pull
 
+log "Preparing storage permissions"
+docker compose   --env-file .env   "${COMPOSE[@]}"   run --rm --no-deps storage-init
+
 log "Refreshing CLI"
-if [[ -f scripts/mailhub-cli.sh ]]; then
-  install -m 0755 scripts/mailhub-cli.sh /usr/local/bin/mailhub
-fi
+[[ ! -f scripts/mailhub-cli.sh ]] || install -m 0755 scripts/mailhub-cli.sh /usr/local/bin/mailhub
 
 log "Starting updated stack"
 docker compose --env-file .env "${COMPOSE[@]}" up -d --remove-orphans
@@ -109,15 +125,17 @@ if [[ "$frontend_ok" != 1 ]]; then
   exit 1
 fi
 
+log "Checking storage permissions"
+chmod +x ./scripts/storage-self-test.sh
+./scripts/storage-self-test.sh
+
 docker image prune -f >/dev/null 2>&1 || true
 
-NEW_COMMIT="$(git rev-parse HEAD)"
+ROLLBACK_READY=0
+trap - ERR
 
-if [[ -x scripts/write-install-info.sh ]]; then
-  scripts/write-install-info.sh >/root/mailhub-install-info.txt.tmp
-  mv -f /root/mailhub-install-info.txt.tmp /root/mailhub-install-info.txt
-  chmod 0600 /root/mailhub-install-info.txt
-fi
+NEW_COMMIT="$(git rev-parse HEAD)"
+if [[ -x scripts/write-install-info.sh ]]; then scripts/write-install-info.sh >/root/mailhub-install-info.txt.tmp; mv -f /root/mailhub-install-info.txt.tmp /root/mailhub-install-info.txt; chmod 0600 /root/mailhub-install-info.txt; fi
 
 IP="$(hostname -I | awk '{print $1}')"
 
