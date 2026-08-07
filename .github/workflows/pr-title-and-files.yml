@@ -1,0 +1,36 @@
+name: Pull Request Guard
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify repository does not contain generated secrets
+        shell: bash
+        run: |
+          test ! -f .env
+          test ! -f mailhub-credentials.env
+          test ! -f mailhub-install-info.txt
+
+      - name: Verify executable CI scripts
+        shell: bash
+        run: |
+          test -x scripts/ci/backend-unit.sh
+          test -x scripts/ci/frontend-build.sh
+          test -x scripts/ci/release-gate.sh
+          test -x scripts/ci/docker-integration.sh

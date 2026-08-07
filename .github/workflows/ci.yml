@@ -1,51 +1,107 @@
-name: CI
+name: Mail Attachment Hub CI
 
 on:
   push:
-    branches: [master, main]
+    branches:
+      - main
+      - master
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  repository-checks:
-    runs-on: ubuntu-latest
+  backend:
+    name: Backend / Python
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Run static checks
-        run: make check
-      - name: Create test environment
-        run: make init
-      - name: Validate Compose
-        run: make config
-      - name: Run backend tests
-        run: make test
-      - name: Start stack and apply migrations
-        run: make up
-      - name: Verify health API
-        run: make api-smoke
-      - name: Verify database schema
-        run: make migration-smoke
-      - name: Test migration downgrade and upgrade
-        run: make migration-cycle
-      - name: Verify authentication
-        run: make auth-smoke
-      - name: Verify frontend
-        run: make frontend-smoke
-      - name: Verify email account API
-        run: make email-account-smoke
-      - name: Verify mail engine worker
-        run: make mail-engine-smoke
-      - name: Verify rule engine
-        run: make rule-engine-smoke
-      - name: Verify storage platform
-        run: make storage-platform-smoke
-      - name: Show status
-        run: make ps
-      - name: Show logs on failure
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Backend unit gate
+        run: ./scripts/ci/backend-unit.sh
+
+  frontend:
+    name: Frontend / TypeScript
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Frontend build gate
+        run: ./scripts/ci/frontend-build.sh
+
+  release-gate:
+    name: Installer / Release Gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Release static gate
+        run: ./scripts/ci/release-gate.sh
+
+  docker-integration:
+    name: Docker Integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs:
+      - backend
+      - frontend
+      - release-gate
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run full Docker integration
+        run: ./scripts/ci/docker-integration.sh
+
+      - name: Show Docker status on failure
         if: failure()
-        run: docker compose --env-file .env -f compose.yml logs --no-color
-      - name: Stop stack
-        if: always()
-        run: docker compose --env-file .env -f compose.yml down --volumes
+        run: |
+          docker compose --env-file .env -f compose.yml ps || true
+          docker compose --env-file .env -f compose.yml logs --no-color --tail=300 || true
+
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-24.04
+    if: always()
+    needs:
+      - backend
+      - frontend
+      - release-gate
+      - docker-integration
+
+    steps:
+      - name: Require all gates
+        shell: bash
+        run: |
+          test "${{ needs.backend.result }}" = "success"
+          test "${{ needs.frontend.result }}" = "success"
+          test "${{ needs.release-gate.result }}" = "success"
+          test "${{ needs.docker-integration.result }}" = "success"
+          echo "All Mail Attachment Hub CI gates passed."

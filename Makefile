@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
-.PHONY: help init check config build test frontend-build up down restart ps logs wait api-smoke frontend-smoke migrate migration-smoke migration-cycle auth-smoke email-account-smoke mail-engine-smoke rule-engine-smoke storage-platform-smoke doctor backup production-up clean reset
+.PHONY: help init check config build test frontend-build up down restart ps logs wait api-smoke frontend-smoke migrate migration-smoke migration-cycle auth-smoke email-account-smoke mail-engine-smoke rule-engine-smoke storage-platform-smoke doctor backup production-up clean reset ci-fast ci-release
 
 help:
 	@printf '%s\n' \
@@ -36,13 +36,13 @@ init:
 	@./scripts/init-env.sh
 
 check:
-	@./tests/repository-check.sh
-	@./tests/clean-tree-check.sh
-	@./tests/env-check.sh .env.example
-	@./tests/compose-static-check.sh
-	@./tests/backend-static-check.sh
-	@./tests/migration-static-check.sh
-	@./tests/frontend-static-check.sh
+	@bash ./tests/repository-check.sh
+	@bash ./tests/clean-tree-check.sh
+	@bash ./tests/env-check.sh .env.example
+	@bash ./tests/compose-static-check.sh
+	@bash ./tests/backend-static-check.sh
+	@bash ./tests/migration-static-check.sh
+	@bash ./tests/frontend-static-check.sh
 
 config:
 	@./scripts/require-env.sh
@@ -121,3 +121,12 @@ backup:
 
 production-up: config
 	@docker compose --env-file .env -f compose.yml -f compose.prod.yml up -d --build
+
+
+ci-fast:
+	@./scripts/ci/release-gate.sh
+	@cd frontend && tsc -p tsconfig.json --noEmit
+	@cd backend && PYTHONPATH=src pytest -q
+
+ci-release:
+	@./scripts/ci/docker-integration.sh
