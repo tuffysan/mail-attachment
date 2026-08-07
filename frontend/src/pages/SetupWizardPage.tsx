@@ -11,6 +11,7 @@ import {
   getSetupStatus,
   listManagedStorageDestinations,
   updateSetupPreferences,
+  validateEmailAccount,
 } from '../api'
 import type { SetupStatus, User } from '../types'
 
@@ -33,6 +34,8 @@ export function SetupWizardPage() {
   const [emailAddress, setEmailAddress] = useState('')
   const [emailPassword, setEmailPassword] = useState('')
   const [imapHost, setImapHost] = useState('imap.gmail.com')
+  const [emailValidated, setEmailValidated] = useState(false)
+  const [emailValidationMessage, setEmailValidationMessage] = useState('')
 
   const [storageName, setStorageName] = useState('Local routed files')
   const [storagePath, setStoragePath] = useState('/data/routed')
@@ -87,12 +90,77 @@ export function SetupWizardPage() {
     }
   }
 
+
+function updateEmailAddress(value: string) {
+  setEmailAddress(value)
+  setEmailValidated(false)
+  setEmailValidationMessage('')
+}
+
+function updateEmailPassword(value: string) {
+  setEmailPassword(value)
+  setEmailValidated(false)
+  setEmailValidationMessage('')
+}
+
+function updateImapHost(value: string) {
+  setImapHost(value)
+  setEmailValidated(false)
+  setEmailValidationMessage('')
+}
+
+async function validateEmail() {
+  setBusy(true)
+  setError('')
+  setEmailValidationMessage('')
+  setEmailValidated(false)
+
+  try {
+    if (!emailAddress || !emailPassword || !imapHost) {
+      throw new Error(
+        'Fyll i e-postadress, IMAP-server och lösenord innan anslutningen testas.',
+      )
+    }
+
+    const result = await validateEmailAccount({
+      host: imapHost,
+      port: 993,
+      username: emailAddress,
+      password: emailPassword,
+      mailbox: 'INBOX',
+      use_ssl: true,
+    })
+
+    setEmailValidated(true)
+    setEmailValidationMessage(
+      `Anslutningen fungerar. ${result.message_count ?? 0} meddelanden hittades i ${result.mailbox}.`,
+    )
+  } catch (caught) {
+    setError(
+      caught instanceof ApiError
+        ? caught.message
+        : caught instanceof Error
+          ? caught.message
+          : 'IMAP-anslutningen kunde inte verifieras.',
+    )
+  } finally {
+    setBusy(false)
+  }
+}
+
   async function saveEmail(event: FormEvent) {
     event.preventDefault()
     setBusy(true)
     setError('')
     try {
-      if (emailAddress && emailPassword) {
+      if (emailAddress || emailPassword) {
+        if (!emailAddress || !emailPassword) {
+          throw new Error('Fyll i både e-postadress och lösenord, eller hoppa över steget.')
+        }
+        if (!emailValidated) {
+          throw new Error('Testa IMAP-inställningarna innan kontot sparas.')
+        }
+
         await createEmailAccount({
           name: 'Primary inbox',
           email_address: emailAddress,
@@ -186,8 +254,20 @@ export function SetupWizardPage() {
         </div>
 
         <div className="wizard-progress" aria-label={`Steg ${step} av 5`}>
-          {[1,2,3,4,5].map(value => (
-            <span key={value} className={value <= step ? 'active' : ''}>{value}</span>
+          {[
+            [1, 'Admin'],
+            [2, 'E-post'],
+            [3, 'Lagring'],
+            [4, 'Regel'],
+            [5, 'Klart'],
+          ].map(([value, label]) => (
+            <span
+              key={value}
+              className={Number(value) <= step ? 'active' : ''}
+              title={String(label)}
+            >
+              {value}
+            </span>
           ))}
         </div>
 
@@ -228,16 +308,74 @@ export function SetupWizardPage() {
         {step === 2 && (
           <form onSubmit={saveEmail}>
             <h2>Anslut första e-postkontot</h2>
-            <p className="muted">Du kan hoppa över detta och konfigurera OAuth eller IMAP senare.</p>
-            <label>E-postadress</label>
-            <input type="email" value={emailAddress} onChange={e => setEmailAddress(e.target.value)} />
-            <label>IMAP-server</label>
-            <input value={imapHost} onChange={e => setImapHost(e.target.value)} />
-            <label>Applösenord eller IMAP-lösenord</label>
-            <input type="password" value={emailPassword} onChange={e => setEmailPassword(e.target.value)} />
+
+            {status?.has_email_account ? (
+              <div className="success">
+                Ett e-postkonto finns redan. Du kan fortsätta utan att skapa ett nytt.
+              </div>
+            ) : (
+              <>
+                <p className="muted">
+                  För vanliga IMAP-konton testas anslutningen innan uppgifterna
+                  sparas. Google OAuth kan konfigureras efter första-start-guiden.
+                </p>
+
+                <label>E-postadress</label>
+                <input
+                  type="email"
+                  value={emailAddress}
+                  onChange={e => updateEmailAddress(e.target.value)}
+                />
+
+                <label>IMAP-server</label>
+                <input
+                  value={imapHost}
+                  onChange={e => updateImapHost(e.target.value)}
+                />
+
+                <label>Applösenord eller IMAP-lösenord</label>
+                <input
+                  type="password"
+                  value={emailPassword}
+                  onChange={e => updateEmailPassword(e.target.value)}
+                />
+
+                {emailValidationMessage && (
+                  <div className="success">{emailValidationMessage}</div>
+                )}
+              </>
+            )}
+
             <div className="wizard-actions">
-              <button type="button" className="secondary" onClick={() => setStep(3)}>Hoppa över</button>
-              <button disabled={busy}>{busy ? 'Sparar…' : 'Spara och fortsätt'}</button>
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy}
+                onClick={() => setStep(3)}
+              >
+                {status?.has_email_account ? 'Fortsätt' : 'Hoppa över'}
+              </button>
+
+              {!status?.has_email_account && (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={busy || !emailAddress || !emailPassword}
+                  onClick={() => void validateEmail()}
+                >
+                  {busy ? 'Testar…' : 'Testa anslutning'}
+                </button>
+              )}
+
+              {!status?.has_email_account && (
+                <button disabled={busy || !emailValidated}>
+                  {busy
+                    ? 'Sparar…'
+                    : emailValidated
+                      ? 'Spara verifierat konto'
+                      : 'Testa först'}
+                </button>
+              )}
             </div>
           </form>
         )}
@@ -282,14 +420,30 @@ export function SetupWizardPage() {
             <div className="setup-summary">
               <p><strong>Språk:</strong> {language}</p>
               <p><strong>Tidszon:</strong> {timezone}</p>
-              <p><strong>E-post:</strong> {emailAddress || (status?.has_email_account ? 'Redan konfigurerad' : 'Konfigureras senare')}</p>
+              <p>
+                <strong>E-post:</strong>{' '}
+                {emailAddress
+                  ? `${emailAddress}${emailValidated ? ' · verifierad' : ''}`
+                  : status?.has_email_account
+                    ? 'Redan konfigurerad'
+                    : 'Konfigureras senare'}
+              </p>
               <p><strong>Lagring:</strong> {destinationId ? 'Konfigurerad' : 'Konfigureras senare'}</p>
               <p><strong>Regel:</strong> {ruleName || 'Konfigureras senare'}</p>
             </div>
             <div className="success">
-              Spara filen <code>/root/mailhub-credentials.txt</code> säkert och testa backup innan produktionsdrift.
+              Spara filen <code>/root/mailhub-credentials.txt</code> säkert och
+              testa backup innan produktionsdrift.
             </div>
-            <button disabled={busy} onClick={finish}>{busy ? 'Slutför…' : 'Slutför installationen'}</button>
+            <div className="setup-next-steps">
+              <p className="muted">
+                Efter guiden kan du konfigurera Google OAuth, lägga till fler
+                konton och kontrollera systemstatus från Operations Dashboard.
+              </p>
+            </div>
+            <button disabled={busy} onClick={finish}>
+              {busy ? 'Slutför…' : 'Slutför och öppna översikten'}
+            </button>
           </section>
         )}
       </section>

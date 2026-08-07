@@ -1,19 +1,45 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, clearToken, getCurrentUser, getReadiness } from '../api'
 import type { ReadyResponse, User } from '../types'
+
+function healthLabel(name: string): string {
+  if (name === 'postgres') return 'PostgreSQL'
+  if (name === 'redis') return 'Redis'
+  if (name === 'attachment_storage') return 'Bilagelagring'
+  return name.replaceAll('_', ' ')
+}
 
 export function DashboardPage() {
   const navigate = useNavigate()
   const [user, setUser] = useState<User | null>(null)
   const [health, setHealth] = useState<ReadyResponse | null>(null)
-  const [error, setError] = useState('')
+  const [userError, setUserError] = useState('')
+  const [healthError, setHealthError] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
+
+  const loadHealth = useCallback(async () => {
+    setRefreshing(true)
+    setHealthError('')
+
+    try {
+      setHealth(await getReadiness())
+    } catch (caught) {
+      setHealthError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Dashboarden kunde inte läsa systemstatus från backend.',
+      )
+    } finally {
+      setRefreshing(false)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
 
     async function loadDashboard() {
-      setError('')
+      setUserError('')
 
       try {
         const currentUser = await getCurrentUser()
@@ -26,18 +52,17 @@ export function DashboardPage() {
         }
 
         if (!cancelled) {
-          setError('Dashboarden kunde inte läsa användarinformation från backend.')
+          setUserError(
+            caught instanceof ApiError
+              ? caught.message
+              : 'Dashboarden kunde inte läsa användarinformation från backend.',
+          )
         }
         return
       }
 
-      try {
-        const readiness = await getReadiness()
-        if (!cancelled) setHealth(readiness)
-      } catch {
-        if (!cancelled) {
-          setError('Dashboarden kunde inte läsa systemstatus från backend.')
-        }
+      if (!cancelled) {
+        await loadHealth()
       }
     }
 
@@ -46,7 +71,7 @@ export function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [navigate])
+  }, [loadHealth, navigate])
 
   function logout() {
     clearToken()
@@ -60,11 +85,21 @@ export function DashboardPage() {
           <p className="eyebrow">Mail Attachment Hub</p>
           <h1>Översikt</h1>
         </div>
-        <button className="secondary" onClick={logout}>Logga ut</button>
+        <div className="card-actions">
+          <button
+            className="secondary"
+            disabled={refreshing}
+            onClick={() => void loadHealth()}
+          >
+            {refreshing ? 'Kontrollerar…' : 'Uppdatera status'}
+          </button>
+          <button className="secondary" onClick={logout}>Logga ut</button>
+        </div>
       </header>
 
       <main className="content">
-        {error && <div className="alert" role="alert">{error}</div>}
+        {userError && <div className="alert" role="alert">{userError}</div>}
+        {healthError && <div className="alert" role="alert">{healthError}</div>}
 
         <section className="welcome-card">
           <div>
@@ -73,6 +108,46 @@ export function DashboardPage() {
             <p className="muted">{user?.email}</p>
           </div>
           {user?.is_admin && <span className="badge">Administratör</span>}
+        </section>
+
+        <section className="quick-actions" aria-labelledby="quick-actions-title">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Snabbvägar</p>
+              <h2 id="quick-actions-title">Hantera Mail Attachment Hub</h2>
+            </div>
+          </div>
+
+          <div className="quick-action-grid">
+            <Link className="quick-action-card" to="/email-accounts">
+              <strong>E-postkonton</strong>
+              <span>IMAP, Gmail OAuth, test och synkronisering.</span>
+            </Link>
+
+            <Link className="quick-action-card" to="/rules">
+              <strong>Regler</strong>
+              <span>Bestäm vilka bilagor som ska routas och vart.</span>
+            </Link>
+
+            <Link className="quick-action-card" to="/storage">
+              <strong>Lagring</strong>
+              <span>Destinationer, anslutningstest och lokala rättigheter.</span>
+            </Link>
+
+            {user?.is_admin && (
+              <Link className="quick-action-card" to="/admin/google-oauth">
+                <strong>Google OAuth</strong>
+                <span>Konfigurera Google Cloud och anslut Gmail.</span>
+              </Link>
+            )}
+
+            {user?.is_admin && (
+              <Link className="quick-action-card" to="/admin">
+                <strong>Operations</strong>
+                <span>Workers, GitHub Update, health och senaste fel.</span>
+              </Link>
+            )}
+          </div>
         </section>
 
         <section aria-labelledby="system-status-title">
@@ -109,18 +184,10 @@ export function DashboardPage() {
                     }`}
                   />
                   <div>
-                    <h3>
-                      {name === 'postgres'
-                        ? 'PostgreSQL'
-                        : name === 'redis'
-                          ? 'Redis'
-                          : name === 'attachment_storage'
-                            ? 'Bilagelagring'
-                            : name}
-                    </h3>
+                    <h3>{healthLabel(name)}</h3>
                     <p>
                       {check.status === 'ok'
-                        ? 'Ansluten och redo'
+                        ? check.detail || 'Ansluten och redo'
                         : check.detail}
                     </p>
                   </div>
@@ -130,27 +197,6 @@ export function DashboardPage() {
               <p className="muted">Läser systemstatus…</p>
             )}
           </div>
-        </section>
-
-        <section className="coming-next">
-          <p className="eyebrow">E-post</p>
-          <h2>Anslut dina inkorgar</h2>
-          <p className="muted">
-            Lägg till flera IMAP-konton, spara uppgifterna krypterat och testa
-            anslutningen direkt.
-          </p>
-          <Link className="button-link" to="/email-accounts">
-            Hantera e-postkonton
-          </Link>
-          <Link className="button-link" to="/rules">
-            Hantera regler
-          </Link>
-          <Link className="button-link secondary" to="/storage">
-            Hantera lagring
-          </Link>
-          <Link className="button-link secondary" to="/admin">
-            Administration
-          </Link>
         </section>
       </main>
     </div>
