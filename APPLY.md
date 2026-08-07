@@ -1,29 +1,36 @@
-# Apply Web Update Agent permission fix
+# Apply installer update-agent fix
 
-Copy all files over the repository.
+Copy the files over the repository root.
+
+## Commit
 
 ```powershell
-git add scripts compose.yml proxmox/install.sh docs/WEB_UPDATE_AGENT_REPAIR.md
-git commit -m "fix(update): make LXC update control directory writable"
+git add proxmox/install.sh scripts/install-update-agent.sh scripts/update-agent.sh scripts/lxc-update.sh
+git commit -m "fix(installer): install update agent before Docker startup"
 git push origin main
 ```
 
-## Repair existing LXC 134
+## Clean reinstall
 
 ```bash
-pct enter 134
+pct stop 134 2>/dev/null || true
+pct destroy 134 --purge 2>/dev/null || true
 
-cd /opt/mail-attachment-hub
-git pull --ff-only origin main
-
-chmod +x scripts/repair-update-agent.sh
-./scripts/repair-update-agent.sh
+bash -c "$(curl -fsSL "https://raw.githubusercontent.com/tuffysan/mail-attachment/main/proxmox/install.sh?$(date +%s)")"
 ```
 
-Reload the browser with Ctrl+F5 and open:
+During installation you should now see:
 
 ```text
-Administration -> Operations Dashboard -> GitHub-uppdatering
+Installing MailHub Update Agent
+Update agent status:
+enabled
+active
 ```
 
-Click **Kontrollera GitHub**.
+and later:
+
+```text
+Verifying MailHub Update Agent
+Update agent control directory: writable
+```

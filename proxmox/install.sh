@@ -210,7 +210,30 @@ systemctl enable --now docker
 step "Hämtar projektet"
 rm -rf "$INSTALL_DIR"
 git clone --branch "$BRANCH" "https://github.com/${REPO}.git" "$INSTALL_DIR"
+
 cd "$INSTALL_DIR"
+
+echo
+echo "============================================================"
+echo " Installing MailHub Update Agent"
+echo "============================================================"
+
+if [[ ! -f scripts/install-update-agent.sh ]]; then
+  echo "Missing scripts/install-update-agent.sh" >&2
+  exit 1
+fi
+
+chmod +x \
+  scripts/install-update-agent.sh \
+  scripts/update-agent.sh \
+  scripts/lxc-update.sh
+
+./scripts/install-update-agent.sh
+
+echo
+echo "Update agent status:"
+systemctl is-enabled mailhub-update-agent.path
+systemctl is-active mailhub-update-agent.path
 
 # Install the host-side web update agent before Docker starts. This also creates
 # /var/lib/mailhub-control with ownership matching backend UID/GID 10001.
@@ -247,6 +270,29 @@ docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml build 
 
 step "Startar tjänster"
 docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml up -d
+
+echo
+echo "============================================================"
+echo " Verifying MailHub Update Agent"
+echo "============================================================"
+
+docker compose \
+  --env-file .env \
+  -f compose.yml \
+  -f compose.override.lxc.yml \
+  exec -T backend sh -c '
+    set -e
+    echo "Backend identity:"
+    id
+    echo
+    echo "Control directory:"
+    ls -ldn /control
+    echo
+    touch /control/.mailhub-install-test
+    rm -f /control/.mailhub-install-test
+    echo "Update agent control directory: writable"
+  '
+
 
 step "Väntar på webbgränssnitt och API"
 api_ok=0
