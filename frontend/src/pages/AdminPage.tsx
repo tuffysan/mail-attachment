@@ -25,6 +25,31 @@ function shortCommit(value: string | null): string {
   return value ? value.slice(0, 8) : '–'
 }
 
+function updateStateLabel(
+  state: UpdateStatus['state'] | undefined,
+): string {
+  switch (state) {
+    case 'idle':
+      return 'Redo'
+    case 'checking':
+      return 'Kontrollerar'
+    case 'up_to_date':
+      return 'Uppdaterad'
+    case 'update_available':
+      return 'Ny version finns'
+    case 'updating':
+      return 'Uppdaterar'
+    case 'success':
+      return 'Uppdaterad'
+    case 'error':
+      return 'Fel'
+    case 'unavailable':
+      return 'Ej installerad'
+    default:
+      return 'Okänd'
+  }
+}
+
 export function AdminPage() {
   const [dashboard, setDashboard] = useState<OperationsDashboard | null>(null)
   const [update, setUpdate] = useState<UpdateStatus | null>(null)
@@ -32,6 +57,9 @@ export function AdminPage() {
   const [updateError, setUpdateError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [checkingUpdate, setCheckingUpdate] = useState(false)
+
+  const operationRunning =
+    update?.state === 'checking' || update?.state === 'updating'
 
   async function reload() {
     setRefreshing(true)
@@ -55,6 +83,7 @@ export function AdminPage() {
       setUpdate(current)
       setUpdateError('')
     } catch (caught) {
+      setUpdate(null)
       setUpdateError(
         caught instanceof ApiError
           ? caught.message
@@ -67,7 +96,9 @@ export function AdminPage() {
     setCheckingUpdate(true)
     setUpdateError('')
     try {
-      setUpdate(await checkForUpdates())
+      const next = await checkForUpdates()
+      setUpdate(next)
+      window.setTimeout(() => void loadUpdateStatus(), 1000)
     } catch (caught) {
       setUpdateError(
         caught instanceof ApiError
@@ -90,7 +121,10 @@ export function AdminPage() {
 
     setUpdateError('')
     try {
-      setUpdate(await applyUpdate())
+      const next = await applyUpdate()
+      setUpdate(next)
+      window.setTimeout(() => void loadUpdateStatus(), 1000)
+      window.setTimeout(() => void reload(), 5000)
     } catch (caught) {
       setUpdateError(
         caught instanceof ApiError
@@ -105,13 +139,24 @@ export function AdminPage() {
     void loadUpdateStatus()
 
     const dashboardTimer = window.setInterval(() => void reload(), 30000)
-    const updateTimer = window.setInterval(() => void loadUpdateStatus(), 3000)
 
     return () => {
       window.clearInterval(dashboardTimer)
-      window.clearInterval(updateTimer)
     }
   }, [])
+
+  useEffect(() => {
+    if (!operationRunning) return
+
+    const updateTimer = window.setInterval(
+      () => void loadUpdateStatus(),
+      2000,
+    )
+
+    return () => {
+      window.clearInterval(updateTimer)
+    }
+  }, [operationRunning])
 
   const counts = dashboard?.counts
   const statCards = counts ? [
@@ -122,9 +167,6 @@ export function AdminPage() {
     ['Routingfel', counts.failed_routes, 'Behöver granskas'],
     ['Lagringsfel', counts.failed_storage_destinations, `${counts.healthy_storage_destinations} friska`],
   ] : []
-
-  const operationRunning =
-    update?.state === 'checking' || update?.state === 'updating'
 
   return (
     <div className="app-shell">
@@ -165,21 +207,7 @@ export function AdminPage() {
                     : 'ok'
               }`}
             >
-              {update?.state === 'update_available'
-                ? 'Ny version finns'
-                : update?.state === 'updating'
-                  ? 'Uppdaterar'
-                  : update?.state === 'checking'
-                    ? 'Kontrollerar'
-                    : update?.state === 'error'
-                      ? 'Fel'
-                      : update?.state === 'unavailable'
-                        ? 'Ej installerad'
-                        : update?.state === 'idle'
-                          ? 'Redo'
-                          : update?.state === 'success'
-                            ? 'Uppdaterad'
-                            : 'Uppdaterad'}
+              {updateStateLabel(update?.state)}
             </span>
           </div>
 
@@ -215,6 +243,13 @@ export function AdminPage() {
             <div className="alert">
               Uppdateringsagenten kan inte nås. Kontrollera att LXC-agenten är
               installerad och att backend kan läsa och skriva <code>/control</code>.
+            </div>
+          )}
+
+          {update?.state === 'error' && (
+            <div className="alert">
+              Uppdateringsagenten rapporterade ett fel. Kontrollera
+              <code> /var/lib/mailhub-control/update.log </code> i LXC:n.
             </div>
           )}
 

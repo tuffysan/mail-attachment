@@ -22,8 +22,10 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   if (!response.ok) {
     let detail = 'Begäran misslyckades.'
     try {
-      const body = (await response.json()) as { detail?: string }
-      if (body.detail) detail = body.detail
+      const body = (await response.json()) as { detail?: unknown }
+      if (typeof body.detail === 'string' && body.detail) {
+        detail = body.detail
+      }
     } catch {
       // Keep the generic message when the server did not return JSON.
     }
@@ -67,8 +69,10 @@ export async function getReadiness(): Promise<ReadyResponse> {
   }
   let detail = 'Statuskontrollen misslyckades.'
   try {
-    const body = (await response.json()) as { detail?: string }
-    if (body.detail) detail = body.detail
+    const body = (await response.json()) as { detail?: unknown }
+    if (typeof body.detail === 'string' && body.detail) {
+      detail = body.detail
+    }
   } catch {
     // Keep the generic message when the server did not return JSON.
   }

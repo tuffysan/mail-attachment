@@ -232,3 +232,5 @@ select { width: 100%; border: 1px solid #334155; border-radius: 12px; padding: 1
   color: #bfdbfe;
   font-weight: 700;
 }
+
+.software-update-panel code { overflow-wrap: anywhere; }
