@@ -18,6 +18,8 @@ from mailhub.mail.oauth import (
     create_authorization,
     exchange_code,
     fetch_google_identity,
+    normalize_provider,
+    validate_oauth_callback,
 )
 from mailhub.mail.oauth_settings import (
     google_redirect_uri,
@@ -43,6 +45,11 @@ async def oauth_start(
     session: Annotated[AsyncSession, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> OAuthStart:
+    try:
+        provider = normalize_provider(provider)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
     if provider == "google":
         google = await load_google_oauth_settings(session, settings)
         if not google.configured or not google.public_base_url:
@@ -73,11 +80,25 @@ async def oauth_start(
 )
 async def oauth_callback(
     provider: str,
-    code: str,
-    state: str,
     session: Annotated[AsyncSession, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings)],
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    error_description: str | None = None,
 ):
+    try:
+        provider, code, state = validate_oauth_callback(
+            provider,
+            code=code,
+            state=state,
+            error=error,
+            error_description=error_description,
+        )
+    except ValueError as exc:
+        status_code = 404 if str(exc) == "Unsupported OAuth provider" else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
     try:
         record = await consume_state(provider, state, session)
         tokens = await exchange_code(
@@ -107,6 +128,8 @@ async def oauth_callback(
         try:
             identity = await fetch_google_identity(access_token)
             email = str(identity.get("email") or "").strip().lower()
+            if identity.get("email_verified") is False:
+                raise ValueError("Google account email address is not verified")
         except Exception as exc:
             raise HTTPException(
                 status_code=422,
@@ -162,9 +185,14 @@ async def oauth_callback(
         if refresh_token:
             account.encrypted_refresh_token = cipher.encrypt(refresh_token)
 
+        try:
+            expires_in = max(60, int(tokens.get("expires_in", 3600)))
+        except (TypeError, ValueError):
+            expires_in = 3600
+
         account.access_token_expires_at = (
             datetime.now(UTC)
-            + timedelta(seconds=int(tokens.get("expires_in", 3600)))
+            + timedelta(seconds=expires_in)
         )
 
         if existing is None:
@@ -197,7 +225,13 @@ async def oauth_callback(
         encrypted_access_token=cipher.encrypt(access_token),
         access_token_expires_at=(
             datetime.now(UTC)
-            + timedelta(seconds=int(tokens.get("expires_in", 3600)))
+            + timedelta(
+                seconds=(
+                    max(60, int(tokens.get("expires_in", 3600)))
+                    if str(tokens.get("expires_in", 3600)).isdigit()
+                    else 3600
+                )
+            )
         ),
     )
     session.add(account)

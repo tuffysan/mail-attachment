@@ -12,6 +12,39 @@ from mailhub.config import Settings
 from mailhub.db.models import OAuthState
 from mailhub.mail.oauth_settings import load_google_oauth_settings
 
+SUPPORTED_OAUTH_PROVIDERS = frozenset({"google", "microsoft"})
+
+
+def normalize_provider(provider: str) -> str:
+    normalized = provider.strip().lower()
+    if normalized not in SUPPORTED_OAUTH_PROVIDERS:
+        raise ValueError("Unsupported OAuth provider")
+    return normalized
+
+
+
+def validate_oauth_callback(
+    provider: str,
+    *,
+    code: str | None,
+    state: str | None,
+    error: str | None = None,
+    error_description: str | None = None,
+) -> tuple[str, str, str]:
+    normalized = normalize_provider(provider)
+
+    if error:
+        detail = (error_description or error.replace("_", " ")).strip()
+        raise ValueError(
+            f"OAuth authorization was not completed: {detail}"
+        )
+
+    if not code or not state:
+        raise ValueError("OAuth callback is missing code or state")
+
+    return normalized, code, state
+
+
 
 @dataclass(frozen=True)
 class ProviderConfig:
@@ -27,6 +60,8 @@ async def provider_config(
     settings: Settings,
     session: AsyncSession,
 ) -> ProviderConfig:
+    provider = normalize_provider(provider)
+
     if provider == "google":
         google = await load_google_oauth_settings(session, settings)
         if not google.client_id or not google.client_secret:
@@ -69,6 +104,7 @@ async def create_authorization(
     settings: Settings,
     session: AsyncSession,
 ) -> str:
+    provider = normalize_provider(provider)
     config = await provider_config(provider, settings, session)
     state = secrets.token_urlsafe(32)
     record = OAuthState(
@@ -86,10 +122,16 @@ async def create_authorization(
         "response_type": "code",
         "scope": " ".join(config.scopes),
         "state": state,
-        "access_type": "offline",
-        "prompt": "consent",
-        "include_granted_scopes": "true",
     }
+
+    if provider == "google":
+        params.update(
+            {
+                "access_type": "offline",
+                "prompt": "consent",
+                "include_granted_scopes": "true",
+            }
+        )
 
     return f"{config.authorize_url}?{urlencode(params)}"
 
@@ -99,6 +141,7 @@ async def consume_state(
     state: str,
     session: AsyncSession,
 ) -> OAuthState:
+    provider = normalize_provider(provider)
     digest = hashlib.sha256(state.encode()).hexdigest()
     record = await session.scalar(
         select(OAuthState).where(OAuthState.state_hash == digest)

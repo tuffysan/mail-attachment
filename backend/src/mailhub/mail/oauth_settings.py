@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+
+from cryptography.fernet import InvalidToken
 from urllib.parse import urlparse
 
 from sqlalchemy import select
@@ -59,6 +61,19 @@ async def _delete_value(
         await session.delete(row)
 
 
+def validate_google_client_id(value: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("Google Client ID is required")
+    if any(ch.isspace() for ch in normalized):
+        raise ValueError("Google Client ID must not contain whitespace")
+    if not normalized.endswith(".apps.googleusercontent.com"):
+        raise ValueError(
+            "Google Client ID should end with .apps.googleusercontent.com"
+        )
+    return normalized
+
+
 def validate_public_base_url(value: str) -> str:
     normalized = value.strip().rstrip("/")
     parsed = urlparse(normalized)
@@ -66,7 +81,15 @@ def validate_public_base_url(value: str) -> str:
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("OAuth Base URL must be a valid http:// or https:// URL")
 
+    if parsed.username or parsed.password:
+        raise ValueError("OAuth Base URL must not contain user credentials")
+    if parsed.query or parsed.fragment:
+        raise ValueError("OAuth Base URL must not contain a query string or fragment")
+
     hostname = (parsed.hostname or "").lower()
+    if not hostname:
+        raise ValueError("OAuth Base URL must contain a hostname")
+
     is_localhost = hostname in {"localhost", "127.0.0.1", "::1"}
 
     if parsed.scheme != "https" and not is_localhost:
@@ -75,7 +98,6 @@ def validate_public_base_url(value: str) -> str:
         )
 
     if not is_localhost:
-        # Google rejects raw IP addresses for web OAuth redirects.
         try:
             import ipaddress
             ipaddress.ip_address(hostname)
@@ -102,7 +124,13 @@ async def load_google_oauth_settings(
 
     secret: str | None = None
     if stored_secret:
-        secret = cipher.decrypt(stored_secret)
+        try:
+            secret = cipher.decrypt(stored_secret)
+        except (InvalidToken, ValueError) as exc:
+            raise ValueError(
+                "Stored Google Client Secret cannot be decrypted. "
+                "Save the Google OAuth configuration again."
+            ) from exc
     elif settings.google_client_secret:
         secret = settings.google_client_secret
 
@@ -121,13 +149,7 @@ async def save_google_oauth_settings(
     client_secret: str | None,
     public_base_url: str,
 ) -> GoogleOAuthSettings:
-    normalized_id = client_id.strip()
-    if not normalized_id:
-        raise ValueError("Google Client ID is required")
-    if not normalized_id.endswith(".apps.googleusercontent.com"):
-        raise ValueError(
-            "Google Client ID should end with .apps.googleusercontent.com"
-        )
+    normalized_id = validate_google_client_id(client_id)
 
     normalized_base_url = validate_public_base_url(public_base_url)
     current = await load_google_oauth_settings(session, settings)
