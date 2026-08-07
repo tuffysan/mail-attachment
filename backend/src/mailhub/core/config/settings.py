@@ -101,7 +101,11 @@ class Settings(BaseSettings):
     readiness_timeout_seconds: float = Field(default=2.0, ge=0.1, le=30.0)
     shutdown_timeout_seconds: float = Field(default=30.0, ge=1.0, le=300.0)
 
-    app_secret_key: str = Field(min_length=32, repr=False)
+    app_secret_key: str = Field(
+        default="development-secret-key-not-for-production",
+        min_length=32,
+        repr=False,
+    )
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = Field(default=60, ge=5, le=10080)
 

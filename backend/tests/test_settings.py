@@ -80,3 +80,15 @@ def test_grouped_views_preserve_flat_values() -> None:
         == 90
     )
     assert str(config.mail.attachment_data_dir) == "/tmp/mailhub"
+
+
+def test_default_development_secret_is_available_outside_production() -> None:
+    config = Settings(_env_file=None, app_env="test")
+
+    assert len(config.app_secret_key) >= 32
+    assert "development-secret" in config.app_secret_key
+
+
+def test_default_development_secret_is_rejected_in_production() -> None:
+    with pytest.raises(ValidationError, match="placeholder"):
+        Settings(_env_file=None, app_env="production")
