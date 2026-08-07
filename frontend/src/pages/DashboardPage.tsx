@@ -10,19 +10,42 @@ export function DashboardPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    Promise.all([getCurrentUser(), getReadiness()])
-      .then(([currentUser, readiness]) => {
-        setUser(currentUser)
-        setHealth(readiness)
-      })
-      .catch((caught) => {
+    let cancelled = false
+
+    async function loadDashboard() {
+      setError('')
+
+      try {
+        const currentUser = await getCurrentUser()
+        if (!cancelled) setUser(currentUser)
+      } catch (caught) {
         if (caught instanceof ApiError && caught.status === 401) {
           clearToken()
           navigate('/login', { replace: true })
           return
         }
-        setError('Dashboarden kunde inte läsa status från backend.')
-      })
+
+        if (!cancelled) {
+          setError('Dashboarden kunde inte läsa användarinformation från backend.')
+        }
+        return
+      }
+
+      try {
+        const readiness = await getReadiness()
+        if (!cancelled) setHealth(readiness)
+      } catch {
+        if (!cancelled) {
+          setError('Dashboarden kunde inte läsa systemstatus från backend.')
+        }
+      }
+    }
+
+    void loadDashboard()
+
+    return () => {
+      cancelled = true
+    }
   }, [navigate])
 
   function logout() {
@@ -42,6 +65,7 @@ export function DashboardPage() {
 
       <main className="content">
         {error && <div className="alert" role="alert">{error}</div>}
+
         <section className="welcome-card">
           <div>
             <p className="eyebrow">Inloggad användare</p>
@@ -57,32 +81,76 @@ export function DashboardPage() {
               <p className="eyebrow">System</p>
               <h2 id="system-status-title">Tjänstestatus</h2>
             </div>
-            <span className={`status-pill ${health?.status === 'ok' ? 'ok' : 'pending'}`}>
-              {health?.status === 'ok' ? 'Alla system fungerar' : 'Kontrollerar…'}
+
+            <span
+              className={`status-pill ${
+                health?.status === 'ok'
+                  ? 'ok'
+                  : health?.status === 'degraded'
+                    ? 'failed'
+                    : 'pending'
+              }`}
+            >
+              {health?.status === 'ok'
+                ? 'Alla system fungerar'
+                : health?.status === 'degraded'
+                  ? 'En eller flera tjänster är degraderade'
+                  : 'Kontrollerar…'}
             </span>
           </div>
 
           <div className="status-grid">
-            {health ? Object.entries(health.checks).map(([name, check]) => (
-              <article className="status-card" key={name}>
-                <div className={`status-dot ${check.status === 'ok' ? 'ok' : 'failed'}`} />
-                <div>
-                  <h3>{name === 'postgres' ? 'PostgreSQL' : name === 'redis' ? 'Redis' : name}</h3>
-                  <p>{check.status === 'ok' ? 'Ansluten och redo' : check.detail}</p>
-                </div>
-              </article>
-            )) : <p className="muted">Läser systemstatus…</p>}
+            {health ? (
+              Object.entries(health.checks).map(([name, check]) => (
+                <article className="status-card" key={name}>
+                  <div
+                    className={`status-dot ${
+                      check.status === 'ok' ? 'ok' : 'failed'
+                    }`}
+                  />
+                  <div>
+                    <h3>
+                      {name === 'postgres'
+                        ? 'PostgreSQL'
+                        : name === 'redis'
+                          ? 'Redis'
+                          : name === 'attachment_storage'
+                            ? 'Bilagelagring'
+                            : name}
+                    </h3>
+                    <p>
+                      {check.status === 'ok'
+                        ? 'Ansluten och redo'
+                        : check.detail}
+                    </p>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p className="muted">Läser systemstatus…</p>
+            )}
           </div>
         </section>
 
         <section className="coming-next">
           <p className="eyebrow">E-post</p>
           <h2>Anslut dina inkorgar</h2>
-          <p className="muted">Lägg till flera IMAP-konton, spara uppgifterna krypterat och testa anslutningen direkt.</p>
-          <Link className="button-link" to="/email-accounts">Hantera e-postkonton</Link>
-          <Link className="button-link" to="/rules">Hantera regler</Link>
-          <Link className="button-link secondary" to="/storage">Hantera lagring</Link>
-          <Link className="button-link secondary" to="/admin">Administration</Link>
+          <p className="muted">
+            Lägg till flera IMAP-konton, spara uppgifterna krypterat och testa
+            anslutningen direkt.
+          </p>
+          <Link className="button-link" to="/email-accounts">
+            Hantera e-postkonton
+          </Link>
+          <Link className="button-link" to="/rules">
+            Hantera regler
+          </Link>
+          <Link className="button-link secondary" to="/storage">
+            Hantera lagring
+          </Link>
+          <Link className="button-link secondary" to="/admin">
+            Administration
+          </Link>
         </section>
       </main>
     </div>

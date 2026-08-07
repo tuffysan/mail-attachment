@@ -56,8 +56,29 @@ export function getCurrentUser(): Promise<User> {
   return request<User>('/api/v1/auth/me')
 }
 
-export function getReadiness(): Promise<ReadyResponse> {
-  return request<ReadyResponse>('/health/ready')
+export async function getReadiness(): Promise<ReadyResponse> {
+  const response = await fetch('/health/ready', {
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+
+  // Readiness deliberately returns HTTP 503 when one or more dependencies are
+  // degraded. That is still a valid dashboard response and must be rendered,
+  // not treated as a transport failure.
+  if (response.status === 200 || response.status === 503) {
+    return (await response.json()) as ReadyResponse
+  }
+
+  let detail = 'Statuskontrollen misslyckades.'
+  try {
+    const body = (await response.json()) as { detail?: string }
+    if (body.detail) detail = body.detail
+  } catch {
+    // Keep the generic message when the server did not return JSON.
+  }
+
+  throw new ApiError(detail, response.status)
 }
 
 
