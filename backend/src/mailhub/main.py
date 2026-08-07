@@ -7,6 +7,7 @@ from fastapi.responses import PlainTextResponse
 
 from mailhub import __version__
 from mailhub.api.auth import router as auth_router
+from mailhub.api.backups import router as backups_router
 from mailhub.api.email_accounts import router as email_accounts_router
 from mailhub.api.mail_engine import router as mail_engine_router
 from mailhub.api.rules import router as rules_router
@@ -153,6 +154,7 @@ app.include_router(mail_engine_router)
 app.include_router(rules_router)
 app.include_router(storage_router)
 app.include_router(admin_router)
+app.include_router(backups_router)
 app.include_router(system_router)
 app.include_router(setup_router)
 app.include_router(operations_router)

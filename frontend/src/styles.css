@@ -234,3 +234,48 @@ select { width: 100%; border: 1px solid #334155; border-radius: 12px; padding: 1
 }
 
 .software-update-panel code { overflow-wrap: anywhere; }
+
+
+.backup-list {
+  display: grid;
+  gap: 14px;
+}
+.backup-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  border: 1px solid rgba(148,163,184,.16);
+  border-radius: 18px;
+  background: rgba(15,23,42,.64);
+}
+.backup-card-main {
+  min-width: 0;
+  flex: 1;
+}
+.backup-card h3 {
+  overflow-wrap: anywhere;
+}
+.backup-size-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(90px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+.backup-size-grid span {
+  display: grid;
+  gap: 3px;
+}
+.backup-size-grid small {
+  color: #94a3b8;
+}
+@media (max-width: 760px) {
+  .backup-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .backup-size-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

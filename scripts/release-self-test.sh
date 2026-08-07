@@ -16,7 +16,10 @@ for file in \
   scripts/storage-self-test.sh \
   scripts/repair-storage-permissions.sh \
   scripts/repair-update-agent.sh \
-  scripts/post-install-check.sh
+  scripts/post-install-check.sh \
+  scripts/backup.sh \
+  scripts/restore.sh \
+  scripts/test-backup-restore-platform.sh
 do
   bash -n "$file"
 done

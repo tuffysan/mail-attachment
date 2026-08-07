@@ -183,6 +183,9 @@ export function AdminPage() {
           >
             {refreshing ? 'Uppdaterar…' : 'Uppdatera status'}
           </button>
+          <Link className="button-link secondary" to="/admin/backups">
+            Backup & Restore
+          </Link>
           <Link className="button-link secondary" to="/">
             Till översikten
           </Link>

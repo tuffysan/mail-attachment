@@ -26,7 +26,7 @@ done
 mkdir -p "$CONTROL_DIR"
 
 # Remove stale request files before enabling the watcher.
-rm -f "$CONTROL_DIR/request.json" "$CONTROL_DIR"/.request-*.tmp
+rm -f "$CONTROL_DIR/request.json" "$CONTROL_DIR"/.request-*.tmp "$CONTROL_DIR/.last-request.json"
 
 # The Docker backend runs as 10001:10001.
 chown -R "${BACKEND_UID}:${BACKEND_GID}" "$CONTROL_DIR"
@@ -75,9 +75,36 @@ touch "$CONTROL_DIR/update.lock"
 chown root:root "$CONTROL_DIR/update.lock"
 chmod 0644 "$CONTROL_DIR/update.lock"
 
+cat > "$CONTROL_DIR/maintenance-status.json.tmp" <<'EOF'
+{
+  "state": "idle",
+  "action": null,
+  "backup_id": null,
+  "started_at": null,
+  "finished_at": null,
+  "message": "Backuphanteraren är redo."
+}
+EOF
+jq -e . "$CONTROL_DIR/maintenance-status.json.tmp" >/dev/null
+chown "${BACKEND_UID}:${BACKEND_GID}" "$CONTROL_DIR/maintenance-status.json.tmp"
+chmod 0660 "$CONTROL_DIR/maintenance-status.json.tmp"
+mv -f "$CONTROL_DIR/maintenance-status.json.tmp" "$CONTROL_DIR/maintenance-status.json"
+
+if [[ ! -s "$CONTROL_DIR/backups.json" ]]; then
+  printf '[]\n' > "$CONTROL_DIR/backups.json"
+fi
+jq -e . "$CONTROL_DIR/backups.json" >/dev/null || printf '[]\n' > "$CONTROL_DIR/backups.json"
+chown "${BACKEND_UID}:${BACKEND_GID}" "$CONTROL_DIR/backups.json"
+chmod 0660 "$CONTROL_DIR/backups.json"
+
+mkdir -p /var/backups/mailhub
+chmod 0700 /var/backups/mailhub
+
 chmod +x \
   "$APP_DIR/scripts/update-agent.sh" \
-  "$APP_DIR/scripts/lxc-update.sh"
+  "$APP_DIR/scripts/lxc-update.sh" \
+  "$APP_DIR/scripts/backup.sh" \
+  "$APP_DIR/scripts/restore.sh"
 
 cat > /etc/systemd/system/mailhub-update-agent.service <<EOF
 [Unit]

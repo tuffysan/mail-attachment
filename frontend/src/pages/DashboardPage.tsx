@@ -142,6 +142,13 @@ export function DashboardPage() {
             )}
 
             {user?.is_admin && (
+              <Link className="quick-action-card" to="/admin/backups">
+                <strong>Backup & Restore</strong>
+                <span>Skapa backup, visa historik och återställ säkert.</span>
+              </Link>
+            )}
+
+            {user?.is_admin && (
               <Link className="quick-action-card" to="/admin">
                 <strong>Operations</strong>
                 <span>Workers, GitHub Update, health och senaste fel.</span>

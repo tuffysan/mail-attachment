@@ -277,3 +277,30 @@ export function clearGoogleOAuthConfig() {
     method: 'DELETE',
   })
 }
+
+
+export function getBackups() {
+  return request<import('./types').BackupOverview>('/api/v1/admin/backups')
+}
+
+export function refreshBackups() {
+  return request<import('./types').BackupStatus>('/api/v1/admin/backups/refresh', {
+    method: 'POST',
+  })
+}
+
+export function createBackup() {
+  return request<import('./types').BackupStatus>('/api/v1/admin/backups', {
+    method: 'POST',
+  })
+}
+
+export function restoreBackup(backupId: string, confirmation: string) {
+  return request<import('./types').BackupStatus>('/api/v1/admin/backups/restore', {
+    method: 'POST',
+    body: JSON.stringify({
+      backup_id: backupId,
+      confirmation,
+    }),
+  })
+}

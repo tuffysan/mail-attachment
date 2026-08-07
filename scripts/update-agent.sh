@@ -9,6 +9,9 @@ LOG_FILE="${CONTROL_DIR}/update.log"
 LOCK_FILE="${CONTROL_DIR}/update.lock"
 BRANCH="${BRANCH:-main}"
 REMOTE="${REMOTE:-origin}"
+BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/mailhub}"
+MAINTENANCE_STATUS_FILE="${CONTROL_DIR}/maintenance-status.json"
+BACKUPS_FILE="${CONTROL_DIR}/backups.json"
 
 write_emergency_status() {
   local code="$1"
@@ -65,6 +68,10 @@ if ! jq -e . "$REQUEST_FILE" >/dev/null 2>&1; then
   write_emergency_status 2 "Uppdateringsbegäran innehöll ogiltig JSON."
   exit 2
 fi
+
+cp "$REQUEST_FILE" "$CONTROL_DIR/.last-request.json"
+chown 10001:10001 "$CONTROL_DIR/.last-request.json" 2>/dev/null || true
+chmod 0660 "$CONTROL_DIR/.last-request.json" || true
 
 ACTION="$(jq -r '.action // empty' "$REQUEST_FILE")"
 rm -f "$REQUEST_FILE"
@@ -146,6 +153,113 @@ get_versions() {
   else
     UPDATE_AVAILABLE=true
   fi
+}
+
+
+maintenance_status() {
+  local state="$1"
+  local action="${2:-}"
+  local backup_id="${3:-}"
+  local message="${4:-}"
+  local started="${5:-}"
+  local finished="${6:-}"
+  local tmp="${MAINTENANCE_STATUS_FILE}.tmp"
+
+  jq -n \
+    --arg state "$state" \
+    --arg action "$action" \
+    --arg backup_id "$backup_id" \
+    --arg message "$message" \
+    --arg started "$started" \
+    --arg finished "$finished" \
+    '{
+      state: $state,
+      action: (if ($action | length) > 0 then $action else null end),
+      backup_id: (if ($backup_id | length) > 0 then $backup_id else null end),
+      started_at: (if ($started | length) > 0 then $started else null end),
+      finished_at: (if ($finished | length) > 0 then $finished else null end),
+      message: (if ($message | length) > 0 then $message else null end)
+    }' > "$tmp"
+
+  jq -e . "$tmp" >/dev/null
+  chown 10001:10001 "$tmp" 2>/dev/null || true
+  chmod 0660 "$tmp"
+  mv -f "$tmp" "$MAINTENANCE_STATUS_FILE"
+}
+
+refresh_backup_index() {
+  mkdir -p "$BACKUP_ROOT"
+  chmod 0700 "$BACKUP_ROOT"
+
+  local tmp="${BACKUPS_FILE}.tmp"
+  printf '[]\n' > "$tmp"
+
+  local dir id created size database attachments routed has_env verified entry
+  while IFS= read -r dir; do
+    [[ -d "$dir" ]] || continue
+    id="$(basename "$dir")"
+
+    # Only expose safe basename identifiers through the web API.
+    [[ "$id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] || continue
+
+    created="$(cat "$dir/created-at.txt" 2>/dev/null || true)"
+    if [[ -z "$created" ]]; then
+      created="$(date --iso-8601=seconds -r "$dir" 2>/dev/null || true)"
+    fi
+
+    size="$(du -sb "$dir" 2>/dev/null | awk '{print $1}')"
+    database="$(stat -c '%s' "$dir/database.dump" 2>/dev/null || echo 0)"
+    attachments="$(stat -c '%s' "$dir/attachments.tgz" 2>/dev/null || echo 0)"
+    routed="$(stat -c '%s' "$dir/routed.tgz" 2>/dev/null || echo 0)"
+
+    [[ -s "$dir/env.backup" ]] && has_env=true || has_env=false
+    [[ -f "$dir/.verified" ]] && verified=true || verified=false
+
+    entry="$(
+      jq -n \
+        --arg id "$id" \
+        --arg created "$created" \
+        --argjson size "${size:-0}" \
+        --argjson database "${database:-0}" \
+        --argjson attachments "${attachments:-0}" \
+        --argjson routed "${routed:-0}" \
+        --argjson has_env "$has_env" \
+        --argjson verified "$verified" \
+        '{
+          id: $id,
+          created_at: (if ($created | length) > 0 then $created else null end),
+          size_bytes: $size,
+          database_bytes: $database,
+          attachments_bytes: $attachments,
+          routed_bytes: $routed,
+          has_environment: $has_env,
+          sha256_verified: $verified
+        }'
+    )"
+
+    jq --argjson item "$entry" '. + [$item]' "$tmp" > "${tmp}.next"
+    mv -f "${tmp}.next" "$tmp"
+  done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -print | sort -r)
+
+  jq -e . "$tmp" >/dev/null
+  chown 10001:10001 "$tmp" 2>/dev/null || true
+  chmod 0660 "$tmp"
+  mv -f "$tmp" "$BACKUPS_FILE"
+}
+
+safe_backup_path() {
+  local id="$1"
+  [[ "$id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] || return 1
+
+  local path="$BACKUP_ROOT/$id"
+  [[ -d "$path" ]] || return 1
+
+  local root_real path_real
+  root_real="$(readlink -f "$BACKUP_ROOT")"
+  path_real="$(readlink -f "$path")"
+
+  [[ "$path_real" == "$root_real/"* ]] || return 1
+  printf '%s\n' "$path_real"
 }
 
 case "$ACTION" in
@@ -255,6 +369,124 @@ case "$ACTION" in
       "$(date --iso-8601=seconds)"
     ;;
 
+
+backup_list)
+  STARTED="$(date --iso-8601=seconds)"
+  maintenance_status \
+    "refreshing" "backup_list" "" \
+    "Backuphistoriken uppdateras." \
+    "$STARTED"
+
+  if refresh_backup_index; then
+    maintenance_status \
+      "success" "backup_list" "" \
+      "Backuphistoriken uppdaterades." \
+      "$STARTED" "$(date --iso-8601=seconds)"
+  else
+    maintenance_status \
+      "error" "backup_list" "" \
+      "Backuphistoriken kunde inte uppdateras." \
+      "$STARTED" "$(date --iso-8601=seconds)"
+    exit 1
+  fi
+  ;;
+
+backup_create)
+  STARTED="$(date --iso-8601=seconds)"
+  BACKUP_ID="mailhub-$(date -u +%Y%m%dT%H%M%SZ)"
+  BACKUP_DIR="$BACKUP_ROOT/$BACKUP_ID"
+
+  maintenance_status \
+    "creating" "backup_create" "$BACKUP_ID" \
+    "Backup skapas." \
+    "$STARTED"
+
+  mkdir -p "$BACKUP_ROOT"
+  chmod 0700 "$BACKUP_ROOT"
+
+  {
+    echo
+    echo "===== $(date --iso-8601=seconds) Web backup ====="
+    chmod +x "$APP_DIR/scripts/backup.sh"
+    "$APP_DIR/scripts/backup.sh" "$BACKUP_DIR"
+    touch "$BACKUP_DIR/.verified"
+  } >>"$LOG_FILE" 2>&1 || {
+    maintenance_status \
+      "error" "backup_create" "$BACKUP_ID" \
+      "Backup misslyckades. Se update.log." \
+      "$STARTED" "$(date --iso-8601=seconds)"
+    refresh_backup_index || true
+    exit 1
+  }
+
+  refresh_backup_index
+  maintenance_status \
+    "success" "backup_create" "$BACKUP_ID" \
+    "Backup skapades." \
+    "$STARTED" "$(date --iso-8601=seconds)"
+  ;;
+
+backup_restore)
+  STARTED="$(date --iso-8601=seconds)"
+  BACKUP_ID="$(jq -r '.backup_id // empty' "$CONTROL_DIR/.last-request.json" 2>/dev/null || true)"
+
+  # For restore, the request payload is saved before REQUEST_FILE is removed.
+  if [[ -z "$BACKUP_ID" ]]; then
+    maintenance_status \
+      "error" "backup_restore" "" \
+      "Backup-ID saknas." \
+      "$STARTED" "$(date --iso-8601=seconds)"
+    exit 1
+  fi
+
+  TARGET_DIR="$(safe_backup_path "$BACKUP_ID" || true)"
+  if [[ -z "$TARGET_DIR" ]]; then
+    maintenance_status \
+      "error" "backup_restore" "$BACKUP_ID" \
+      "Vald backup finns inte eller har ogiltigt ID." \
+      "$STARTED" "$(date --iso-8601=seconds)"
+    exit 1
+  fi
+
+  maintenance_status \
+    "restoring" "backup_restore" "$BACKUP_ID" \
+    "Skapar säkerhetsbackup före återställning." \
+    "$STARTED"
+
+  SAFETY_ID="pre-restore-$(date -u +%Y%m%dT%H%M%SZ)"
+  SAFETY_DIR="$BACKUP_ROOT/$SAFETY_ID"
+
+  {
+    echo
+    echo "===== $(date --iso-8601=seconds) Pre-restore safety backup ====="
+    chmod +x "$APP_DIR/scripts/backup.sh" "$APP_DIR/scripts/restore.sh"
+    "$APP_DIR/scripts/backup.sh" "$SAFETY_DIR"
+    touch "$SAFETY_DIR/.verified"
+
+    maintenance_status \
+      "restoring" "backup_restore" "$BACKUP_ID" \
+      "Återställer vald backup. Webbgränssnittet kan startas om." \
+      "$STARTED"
+
+    echo
+    echo "===== $(date --iso-8601=seconds) Web restore: $BACKUP_ID ====="
+    "$APP_DIR/scripts/restore.sh" "$TARGET_DIR"
+  } >>"$LOG_FILE" 2>&1 || {
+    maintenance_status \
+      "error" "backup_restore" "$BACKUP_ID" \
+      "Återställningen misslyckades. Säkerhetsbackup: $SAFETY_ID." \
+      "$STARTED" "$(date --iso-8601=seconds)"
+    refresh_backup_index || true
+    exit 1
+  }
+
+  refresh_backup_index
+  maintenance_status \
+    "success" "backup_restore" "$BACKUP_ID" \
+    "Backup återställd. Säkerhetsbackup skapades som $SAFETY_ID." \
+    "$STARTED" "$(date --iso-8601=seconds)"
+  ;;
+
   *)
     json_status \
       "error" false \
@@ -263,3 +495,5 @@ case "$ACTION" in
     exit 1
     ;;
 esac
+
+rm -f "$CONTROL_DIR/.last-request.json" 2>/dev/null || true

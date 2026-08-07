@@ -55,6 +55,17 @@ def request_update_action(action: str) -> dict[str, Any]:
     if status["state"] in {"checking", "updating"}:
         raise RuntimeError("An update operation is already running")
 
+    maintenance_status = CONTROL_DIR / "maintenance-status.json"
+    try:
+        maintenance = json.loads(maintenance_status.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        maintenance = {}
+    if maintenance.get("state") in {"creating", "restoring", "refreshing"}:
+        raise RuntimeError("A backup operation is already running")
+
+    if REQUEST_FILE.exists():
+        raise RuntimeError("Another LXC maintenance request is already queued")
+
     payload = {
         "action": action,
         "requested_at": _now(),

@@ -228,3 +228,29 @@ export interface GoogleOAuthConfig {
   google_clients_url: string
   gmail_api_url: string
 }
+
+
+export interface BackupItem {
+  id: string
+  created_at: string | null
+  size_bytes: number
+  database_bytes: number
+  attachments_bytes: number
+  routed_bytes: number
+  has_environment: boolean
+  sha256_verified: boolean | null
+}
+
+export interface BackupStatus {
+  state: 'idle' | 'refreshing' | 'creating' | 'restoring' | 'success' | 'error'
+  action: string | null
+  backup_id: string | null
+  started_at: string | null
+  finished_at: string | null
+  message: string | null
+}
+
+export interface BackupOverview {
+  status: BackupStatus
+  backups: BackupItem[]
+}

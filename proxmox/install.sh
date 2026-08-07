@@ -227,7 +227,9 @@ for required_script in \
   scripts/mailhub-cli.sh \
   scripts/write-install-info.sh \
   scripts/lxc-rollback.sh \
-  scripts/post-install-check.sh
+  scripts/post-install-check.sh \
+  scripts/backup.sh \
+  scripts/restore.sh
 do
   if [[ ! -f "$required_script" ]]; then
     echo "Required update-agent file is missing: $required_script" >&2
@@ -244,7 +246,9 @@ chmod +x \
   scripts/mailhub-cli.sh \
   scripts/write-install-info.sh \
   scripts/lxc-rollback.sh \
-  scripts/post-install-check.sh
+  scripts/post-install-check.sh \
+  scripts/backup.sh \
+  scripts/restore.sh
 
 echo "Running scripts/install-update-agent.sh..."
 ./scripts/install-update-agent.sh
