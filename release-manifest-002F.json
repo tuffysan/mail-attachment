@@ -1,0 +1,61 @@
+{
+  "release": "002F",
+  "files": {
+    "VERSION": {
+      "sha256": "c83340fc133926bc1be86248431cda45c2bec2151f0712cff34a3abeff86bd69",
+      "size": 5
+    },
+    "proxmox/install.sh": {
+      "sha256": "8721328ac823d3212237e9a0dcd19bd8f0c4b7f5f33f05a1015cbb3091506def",
+      "size": 17054
+    },
+    "compose.yml": {
+      "sha256": "aae42aef00b9f79ab37bb9500ce4fd495b8d17ee578fbb21c91c4fb121cf2f87",
+      "size": 6604
+    },
+    "compose.override.lxc.yml": {
+      "sha256": "959bb410f92dddd39a9a6a39d6a60b3fe0f68ca16a5b82fc09ceeb6859a853fb",
+      "size": 1626
+    },
+    "scripts/install-update-agent.sh": {
+      "sha256": "9b74317add61912c01e2b00afc5de169fbcb848cf704216ebc47627095eccf15",
+      "size": 4097
+    },
+    "scripts/update-agent.sh": {
+      "sha256": "c000e187a6a83f5dd58dc148f65319a1ac3f460121feba20f59c538c71190df5",
+      "size": 6807
+    },
+    "scripts/lxc-update.sh": {
+      "sha256": "717c97af7e019a06861793fb39ac6d15234c9ccb7dc2c5bcc0c21faea099b4f9",
+      "size": 5031
+    },
+    "scripts/lxc-rollback.sh": {
+      "sha256": "258beb2eea5cc9c37b35a13dec06444d70eb7456e26d50631d8a21ba0520eb05",
+      "size": 2453
+    },
+    "scripts/mailhub-cli.sh": {
+      "sha256": "49ff11842193de41073e005d6235322a80dd4cce86d0df1955d079d3b14ccb07",
+      "size": 7461
+    },
+    "scripts/post-install-check.sh": {
+      "sha256": "ba480a70f6fff3541f4da620bfe2bcf44475bb824fbbb4a3666b1200b833cac1",
+      "size": 3557
+    },
+    "scripts/storage-self-test.sh": {
+      "sha256": "4cdd0a8b303be3e29a1c448f749312fd329de458b41f6993b3d322f4956ae9c3",
+      "size": 2056
+    },
+    "backend/alembic/versions/0008_timestamp_defaults.py": {
+      "sha256": "046e3c343976d57e9fc46f3a1f95eaa582517bd23fbe491e67dbdff6ffc8effb",
+      "size": 2039
+    },
+    "frontend/src/api.ts": {
+      "sha256": "8b17c7868d7475b347cb4727eb81992226684d0e47d37b389c19f8098df193e2",
+      "size": 7858
+    },
+    "frontend/src/pages/AdminPage.tsx": {
+      "sha256": "24742c6b396f4a4f8bf8e6a256a7e3f5d46a0e7eba4f9d61cd476186dc2be55b",
+      "size": 15062
+    }
+  }
+}

@@ -23,6 +23,7 @@ ADMIN_EMAIL="${ADMIN_EMAIL:-unknown}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-unknown}"
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 IP="${IP:-CONTAINER-IP}"
+VERSION="$(cat VERSION 2>/dev/null || echo unknown)"
 COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 
 umask 077
@@ -39,6 +40,9 @@ Login:
 Email:     ${ADMIN_EMAIL}
 Password:  ${ADMIN_PASSWORD}
 
+Version:
+${VERSION}
+
 Installed commit:
 ${COMMIT}
 
@@ -46,6 +50,7 @@ Useful commands:
 mailhub credentials
 mailhub status
 mailhub doctor
+mailhub verify
 mailhub logs backend
 mailhub update
 mailhub backups

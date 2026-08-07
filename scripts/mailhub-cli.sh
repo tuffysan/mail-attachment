@@ -162,11 +162,17 @@ Kommandon:
   mailhub credentials
       Visa IP, portar och administratörsinloggning.
 
+  mailhub version
+      Visa releaseversion och installerad Git commit.
+
   mailhub status
       Visa Docker Compose-status.
 
   mailhub doctor
       Kontrollera Docker, backend, frontend, storage och update-agent.
+
+  mailhub verify
+      Kör full post-install-verifiering.
 
   mailhub logs [service]
       Följ loggar. Exempel: mailhub logs backend
@@ -201,12 +207,24 @@ case "${1:-help}" in
     print_credentials
     ;;
 
+  version)
+    VERSION="$(cat VERSION 2>/dev/null || echo unknown)"
+    COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+    echo "Mail Attachment Hub ${VERSION}"
+    echo "Commit: ${COMMIT}"
+    ;;
+
   status)
     compose_cmd ps
     ;;
 
   doctor)
     doctor
+    ;;
+
+  verify)
+    chmod +x scripts/post-install-check.sh
+    exec scripts/post-install-check.sh
     ;;
 
   logs)

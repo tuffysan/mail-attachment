@@ -226,7 +226,8 @@ for required_script in \
   scripts/repair-storage-permissions.sh \
   scripts/mailhub-cli.sh \
   scripts/write-install-info.sh \
-  scripts/lxc-rollback.sh
+  scripts/lxc-rollback.sh \
+  scripts/post-install-check.sh
 do
   if [[ ! -f "$required_script" ]]; then
     echo "Required update-agent file is missing: $required_script" >&2
@@ -242,7 +243,8 @@ chmod +x \
   scripts/repair-storage-permissions.sh \
   scripts/mailhub-cli.sh \
   scripts/write-install-info.sh \
-  scripts/lxc-rollback.sh
+  scripts/lxc-rollback.sh \
+  scripts/post-install-check.sh
 
 echo "Running scripts/install-update-agent.sh..."
 ./scripts/install-update-agent.sh
@@ -488,6 +490,9 @@ chmod 0600 /root/mailhub-install-info.txt
 
 step "Kör slutlig systemkontroll"
 mailhub doctor
+
+step "Kör post-install-verifiering"
+mailhub verify
 
 echo "COMPLETE" > /root/mailhub-install.status
 step "Installation klar"

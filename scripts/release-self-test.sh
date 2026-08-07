@@ -15,7 +15,8 @@ for file in \
   scripts/write-install-info.sh \
   scripts/storage-self-test.sh \
   scripts/repair-storage-permissions.sh \
-  scripts/repair-update-agent.sh
+  scripts/repair-update-agent.sh \
+  scripts/post-install-check.sh
 do
   bash -n "$file"
 done
@@ -24,6 +25,8 @@ echo "Checking installer release invariants..."
 grep -Fq 'replace_env APP_ENV "production"' proxmox/install.sh
 grep -Fq 'seq 1 900' proxmox/install.sh
 grep -Fq 'mailhub doctor' proxmox/install.sh
+grep -Fq 'mailhub verify' proxmox/install.sh
+grep -Fq 'scripts/post-install-check.sh' proxmox/install.sh
 grep -Fq 'storage-self-test.sh' proxmox/install.sh
 grep -Fq 'install-update-agent.sh' proxmox/install.sh
 
