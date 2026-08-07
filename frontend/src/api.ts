@@ -62,14 +62,9 @@ export async function getReadiness(): Promise<ReadyResponse> {
       Accept: 'application/json',
     },
   })
-
-  // Readiness deliberately returns HTTP 503 when one or more dependencies are
-  // degraded. That is still a valid dashboard response and must be rendered,
-  // not treated as a transport failure.
   if (response.status === 200 || response.status === 503) {
     return (await response.json()) as ReadyResponse
   }
-
   let detail = 'Statuskontrollen misslyckades.'
   try {
     const body = (await response.json()) as { detail?: string }
@@ -77,7 +72,6 @@ export async function getReadiness(): Promise<ReadyResponse> {
   } catch {
     // Keep the generic message when the server did not return JSON.
   }
-
   throw new ApiError(detail, response.status)
 }
 
@@ -205,4 +199,21 @@ export function completeSetup() {
 
 export function getOperationsDashboard() {
   return request<import('./types').OperationsDashboard>('/api/v1/operations/dashboard')
+}
+
+
+export function getUpdateStatus() {
+  return request<import('./types').UpdateStatus>('/api/v1/admin/update/status')
+}
+
+export function checkForUpdates() {
+  return request<import('./types').UpdateStatus>('/api/v1/admin/update/check', {
+    method: 'POST',
+  })
+}
+
+export function applyUpdate() {
+  return request<import('./types').UpdateStatus>('/api/v1/admin/update/apply', {
+    method: 'POST',
+  })
 }

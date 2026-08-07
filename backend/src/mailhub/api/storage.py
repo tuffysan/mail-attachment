@@ -8,17 +8,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from mailhub.auth.dependencies import get_current_user
 from mailhub.config import Settings, get_settings
-from mailhub.db.models import RuleDestination, StorageDestination
+from mailhub.db.models import RuleDestination, StorageDestination, User
 from mailhub.db.session import get_session
 from mailhub.storage.crypto import decrypt_config, encrypt_config
 from mailhub.storage.providers import PROVIDERS, provider_definition
 from mailhub.storage.rclone import test_destination
+from mailhub.storage.local_permissions import inspect_local_permissions, set_local_permissions
 from mailhub.storage.schemas import (
     ProviderResponse,
     StorageDestinationCreate,
     StorageDestinationResponse,
     StorageDestinationUpdate,
     StorageTestResponse,
+    LocalStoragePermissionsResponse,
+    LocalStoragePermissionsUpdate,
 )
 
 router = APIRouter(
@@ -151,3 +154,73 @@ async def test_storage_destination(
     if not result.ok:
         raise HTTPException(status_code=422, detail=result.message)
     return StorageTestResponse(status="ok", message=result.message)
+
+
+
+async def require_storage_admin(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator access required",
+        )
+    return user
+
+
+@router.get(
+    "/destinations/{destination_id}/permissions",
+    response_model=LocalStoragePermissionsResponse,
+)
+async def get_local_storage_permissions(
+    destination_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[User, Depends(require_storage_admin)],
+) -> LocalStoragePermissionsResponse:
+    row = await session.get(StorageDestination, destination_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Storage destination not found")
+    if row.provider != "local":
+        raise HTTPException(
+            status_code=422,
+            detail="Permissions are only available for local storage",
+        )
+
+    try:
+        return LocalStoragePermissionsResponse(
+            **inspect_local_permissions(row.base_path)
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.put(
+    "/destinations/{destination_id}/permissions",
+    response_model=LocalStoragePermissionsResponse,
+)
+async def update_local_storage_permissions(
+    destination_id: UUID,
+    request: LocalStoragePermissionsUpdate,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[User, Depends(require_storage_admin)],
+) -> LocalStoragePermissionsResponse:
+    row = await session.get(StorageDestination, destination_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Storage destination not found")
+    if row.provider != "local":
+        raise HTTPException(
+            status_code=422,
+            detail="Permissions are only available for local storage",
+        )
+
+    mode = request.mode if request.mode.startswith("0") else f"0{request.mode}"
+    try:
+        permissions = set_local_permissions(
+            row.base_path,
+            mode,
+            recursive=request.recursive,
+        )
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return LocalStoragePermissionsResponse(**permissions)

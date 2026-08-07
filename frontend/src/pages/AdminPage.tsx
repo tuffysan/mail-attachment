@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, getOperationsDashboard } from '../api'
-import type { OperationsDashboard } from '../types'
+import {
+  ApiError,
+  applyUpdate,
+  checkForUpdates,
+  getOperationsDashboard,
+  getUpdateStatus,
+} from '../api'
+import type { OperationsDashboard, UpdateStatus } from '../types'
 
 function formatDate(value: string | null): string {
   if (!value) return 'Aldrig'
@@ -15,10 +21,17 @@ function label(name: string): string {
   return name.replaceAll('_', ' ')
 }
 
+function shortCommit(value: string | null): string {
+  return value ? value.slice(0, 8) : '–'
+}
+
 export function AdminPage() {
   const [dashboard, setDashboard] = useState<OperationsDashboard | null>(null)
+  const [update, setUpdate] = useState<UpdateStatus | null>(null)
   const [error, setError] = useState('')
+  const [updateError, setUpdateError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
 
   async function reload() {
     setRefreshing(true)
@@ -26,16 +39,79 @@ export function AdminPage() {
     try {
       setDashboard(await getOperationsDashboard())
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Operationsdata kunde inte läsas.')
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Operationsdata kunde inte läsas.',
+      )
     } finally {
       setRefreshing(false)
     }
   }
 
+  async function loadUpdateStatus() {
+    try {
+      setUpdate(await getUpdateStatus())
+    } catch (caught) {
+      setUpdateError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Uppdateringsstatus kunde inte läsas.',
+      )
+    }
+  }
+
+  async function checkUpdate() {
+    setCheckingUpdate(true)
+    setUpdateError('')
+    try {
+      setUpdate(await checkForUpdates())
+    } catch (caught) {
+      setUpdateError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'GitHub kunde inte kontrolleras.',
+      )
+    } finally {
+      setCheckingUpdate(false)
+    }
+  }
+
+  async function runUpdate() {
+    if (
+      !window.confirm(
+        'Installera den nya versionen nu? Webbgränssnittet kan vara otillgängligt en kort stund.',
+      )
+    ) {
+      return
+    }
+
+    setUpdateError('')
+    try {
+      setUpdate(await applyUpdate())
+    } catch (caught) {
+      setUpdateError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Uppdateringen kunde inte startas.',
+      )
+    }
+  }
+
   useEffect(() => {
     void reload()
-    const timer = window.setInterval(() => void reload(), 30000)
-    return () => window.clearInterval(timer)
+    void loadUpdateStatus()
+
+    // Check GitHub when the operations page is opened.
+    void checkUpdate()
+
+    const dashboardTimer = window.setInterval(() => void reload(), 30000)
+    const updateTimer = window.setInterval(() => void loadUpdateStatus(), 3000)
+
+    return () => {
+      window.clearInterval(dashboardTimer)
+      window.clearInterval(updateTimer)
+    }
   }, [])
 
   const counts = dashboard?.counts
@@ -48,6 +124,9 @@ export function AdminPage() {
     ['Lagringsfel', counts.failed_storage_destinations, `${counts.healthy_storage_destinations} friska`],
   ] : []
 
+  const operationRunning =
+    update?.state === 'checking' || update?.state === 'updating'
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -56,23 +135,139 @@ export function AdminPage() {
           <h1>Operations Dashboard</h1>
         </div>
         <div className="card-actions">
-          <button className="secondary" onClick={() => void reload()} disabled={refreshing}>
-            {refreshing ? 'Uppdaterar…' : 'Uppdatera'}
+          <button
+            className="secondary"
+            onClick={() => void reload()}
+            disabled={refreshing}
+          >
+            {refreshing ? 'Uppdaterar…' : 'Uppdatera status'}
           </button>
-          <Link className="button-link secondary" to="/">Till översikten</Link>
+          <Link className="button-link secondary" to="/">
+            Till översikten
+          </Link>
         </div>
       </header>
 
       <main className="content operations-layout">
         {error && <div className="alert">{error}</div>}
 
+        <section className="panel software-update-panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Programvara</p>
+              <h2>GitHub-uppdatering</h2>
+            </div>
+            <span
+              className={`status-pill ${
+                update?.state === 'update_available'
+                  ? 'pending'
+                  : update?.state === 'error' || update?.state === 'unavailable'
+                    ? 'failed'
+                    : 'ok'
+              }`}
+            >
+              {update?.state === 'update_available'
+                ? 'Ny version finns'
+                : update?.state === 'updating'
+                  ? 'Uppdaterar'
+                  : update?.state === 'checking'
+                    ? 'Kontrollerar'
+                    : update?.state === 'error'
+                      ? 'Fel'
+                      : update?.state === 'unavailable'
+                        ? 'Ej installerad'
+                        : 'Uppdaterad'}
+            </span>
+          </div>
+
+          {updateError && <div className="alert">{updateError}</div>}
+
+          <div className="update-version-grid">
+            <div>
+              <span>Installerad commit</span>
+              <strong>{shortCommit(update?.installed_commit ?? null)}</strong>
+            </div>
+            <div>
+              <span>Senaste på GitHub</span>
+              <strong>{shortCommit(update?.latest_commit ?? null)}</strong>
+            </div>
+            <div>
+              <span>Senast kontrollerad</span>
+              <strong>{formatDate(update?.checked_at ?? null)}</strong>
+            </div>
+          </div>
+
+          {update?.latest_message && (
+            <p className="update-commit-message">
+              <strong>Senaste ändring:</strong> {update.latest_message}
+              {update.latest_date ? ` · ${formatDate(update.latest_date)}` : ''}
+            </p>
+          )}
+
+          {update?.message && (
+            <p className="muted">{update.message}</p>
+          )}
+
+          {update?.state === 'updating' && (
+            <div className="update-progress">
+              <span />
+              <p>
+                Hämtar kod, bygger Docker-images och startar om tjänsterna.
+                Sidan kan tillfälligt tappa kontakten med backend.
+              </p>
+            </div>
+          )}
+
+          <div className="card-actions">
+            <button
+              className="secondary"
+              disabled={operationRunning || checkingUpdate}
+              onClick={() => void checkUpdate()}
+            >
+              {update?.state === 'checking' || checkingUpdate
+                ? 'Kontrollerar…'
+                : 'Kontrollera GitHub'}
+            </button>
+
+            <button
+              disabled={
+                operationRunning ||
+                update?.state !== 'update_available' ||
+                !update?.update_available
+              }
+              onClick={() => void runUpdate()}
+            >
+              {update?.state === 'updating' ? 'Uppdaterar…' : 'Uppdatera nu'}
+            </button>
+
+            {update?.state === 'success' && (
+              <button
+                className="secondary"
+                onClick={() => window.location.reload()}
+              >
+                Ladda om nya gränssnittet
+              </button>
+            )}
+          </div>
+        </section>
+
         <section className="operations-summary">
           <div>
             <p className="eyebrow">Systemstatus</p>
-            <h2>{dashboard?.overall_status === 'ok' ? 'Alla kärntjänster fungerar' : 'Systemet behöver uppmärksamhet'}</h2>
-            <p className="muted">Senast uppdaterad: {formatDate(dashboard?.generated_at ?? null)}</p>
+            <h2>
+              {dashboard?.overall_status === 'ok'
+                ? 'Alla kärntjänster fungerar'
+                : 'Systemet behöver uppmärksamhet'}
+            </h2>
+            <p className="muted">
+              Senast uppdaterad: {formatDate(dashboard?.generated_at ?? null)}
+            </p>
           </div>
-          <span className={`status-pill ${dashboard?.overall_status === 'ok' ? 'ok' : 'failed'}`}>
+          <span
+            className={`status-pill ${
+              dashboard?.overall_status === 'ok' ? 'ok' : 'failed'
+            }`}
+          >
             {dashboard?.overall_status === 'ok' ? 'OK' : 'Degraderad'}
           </span>
         </section>
@@ -90,61 +285,99 @@ export function AdminPage() {
         <div className="operations-columns">
           <section className="panel">
             <div className="section-heading">
-              <div><p className="eyebrow">Beroenden</p><h2>Health checks</h2></div>
+              <div>
+                <p className="eyebrow">Beroenden</p>
+                <h2>Health checks</h2>
+              </div>
             </div>
             <div className="operations-list">
-              {dashboard && Object.entries(dashboard.health).map(([name, check]) => (
-                <div className="operations-row" key={name}>
-                  <div>
-                    <strong>{label(name)}</strong>
-                    <p>{check.detail}</p>
+              {dashboard &&
+                Object.entries(dashboard.health).map(([name, check]) => (
+                  <div className="operations-row" key={name}>
+                    <div>
+                      <strong>{label(name)}</strong>
+                      <p>{check.detail}</p>
+                    </div>
+                    <div className="operations-row-status">
+                      <span
+                        className={`status-pill ${
+                          check.status === 'ok' ? 'ok' : 'failed'
+                        }`}
+                      >
+                        {check.status}
+                      </span>
+                      <small>{check.latency_ms ?? '-'} ms</small>
+                    </div>
                   </div>
-                  <div className="operations-row-status">
-                    <span className={`status-pill ${check.status === 'ok' ? 'ok' : 'failed'}`}>
-                      {check.status}
-                    </span>
-                    <small>{check.latency_ms ?? '-'} ms</small>
-                  </div>
-                </div>
-              ))}
+                ))}
             </div>
           </section>
 
           <section className="panel">
             <div className="section-heading">
-              <div><p className="eyebrow">Workers</p><h2>Bakgrundsprocesser</h2></div>
+              <div>
+                <p className="eyebrow">Workers</p>
+                <h2>Bakgrundsprocesser</h2>
+              </div>
             </div>
             <div className="operations-list">
-              {dashboard?.workers.length ? dashboard.workers.map(worker => (
-                <div className="operations-row" key={worker.name}>
-                  <div>
-                    <strong>{worker.name}</strong>
-                    <p>Heartbeat: {formatDate(worker.heartbeat_at)}</p>
-                    <p>{worker.processed_cycles} cykler · {worker.failures} fel</p>
+              {dashboard?.workers.length ? (
+                dashboard.workers.map(worker => (
+                  <div className="operations-row" key={worker.name}>
+                    <div>
+                      <strong>{worker.name}</strong>
+                      <p>Heartbeat: {formatDate(worker.heartbeat_at)}</p>
+                      <p>
+                        {worker.processed_cycles} cykler · {worker.failures} fel
+                      </p>
+                    </div>
+                    <span
+                      className={`status-pill ${
+                        ['running', 'idle'].includes(worker.state)
+                          ? 'ok'
+                          : 'pending'
+                      }`}
+                    >
+                      {worker.state}
+                    </span>
                   </div>
-                  <span className={`status-pill ${['running','idle'].includes(worker.state) ? 'ok' : 'pending'}`}>
-                    {worker.state}
-                  </span>
-                </div>
-              )) : <p className="muted">Ingen processlokal workerstatus rapporterad.</p>}
+                ))
+              ) : (
+                <p className="muted">
+                  Ingen processlokal workerstatus rapporterad.
+                </p>
+              )}
             </div>
           </section>
         </div>
 
         <section className="panel">
           <div className="section-heading">
-            <div><p className="eyebrow">Lagring</p><h2>Destinationer</h2></div>
-            <Link className="button-link secondary" to="/storage">Hantera lagring</Link>
+            <div>
+              <p className="eyebrow">Lagring</p>
+              <h2>Destinationer</h2>
+            </div>
+            <Link className="button-link secondary" to="/storage">
+              Hantera lagring
+            </Link>
           </div>
           <div className="operations-table">
             <div className="operations-table-head">
-              <span>Namn</span><span>Leverantör</span><span>Status</span><span>Senaste test</span>
+              <span>Namn</span>
+              <span>Leverantör</span>
+              <span>Status</span>
+              <span>Senaste test</span>
             </div>
             {dashboard?.storage.map(item => (
               <div className="operations-table-row" key={item.id}>
-                <span><strong>{item.name}</strong><small>{item.enabled ? 'Aktiv' : 'Inaktiv'}</small></span>
+                <span>
+                  <strong>{item.name}</strong>
+                  <small>{item.enabled ? 'Aktiv' : 'Inaktiv'}</small>
+                </span>
                 <span>{item.provider}</span>
-                <span className={`status-text ${item.status}`}>{item.status}</span>
+                <span className={`status-text ${item.status}`}>
+                  {item.status}
+                </span>
                 <span>{formatDate(item.checked_at)}</span>
               </div>
             ))}
@@ -156,15 +389,24 @@ export function AdminPage() {
             <p className="eyebrow">Senaste fel</p>
             <h2>Problem som behöver granskas</h2>
             <div className="operations-list">
-              {dashboard?.recent_failures.length ? dashboard.recent_failures.map(item => (
-                <div className="failure-row" key={`${item.kind}-${item.id}`}>
-                  <div>
-                    <strong>{item.kind}: {item.subject}</strong>
-                    <p>{item.detail}</p>
+              {dashboard?.recent_failures.length ? (
+                dashboard.recent_failures.map(item => (
+                  <div
+                    className="failure-row"
+                    key={`${item.kind}-${item.id}`}
+                  >
+                    <div>
+                      <strong>
+                        {item.kind}: {item.subject}
+                      </strong>
+                      <p>{item.detail}</p>
+                    </div>
+                    <small>{formatDate(item.created_at)}</small>
                   </div>
-                  <small>{formatDate(item.created_at)}</small>
-                </div>
-              )) : <div className="success">Inga senaste sync- eller routingfel.</div>}
+                ))
+              ) : (
+                <div className="success">Inga senaste sync- eller routingfel.</div>
+              )}
             </div>
           </section>
 
@@ -174,7 +416,9 @@ export function AdminPage() {
             <div className="operations-list">
               {dashboard?.recent_activity.map(item => (
                 <div className="activity-row" key={item.id}>
-                  <span className={`activity-level ${item.level}`}>{item.level}</span>
+                  <span className={`activity-level ${item.level}`}>
+                    {item.level}
+                  </span>
                   <div>
                     <strong>{item.event_type}</strong>
                     <p>{item.message}</p>

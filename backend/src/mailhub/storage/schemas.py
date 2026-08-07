@@ -40,3 +40,20 @@ class ProviderResponse(BaseModel):
     label: str
     fields: list[str]
     secret_fields: list[str]
+
+
+class LocalStoragePermissionsResponse(BaseModel):
+    path: str
+    exists: bool
+    uid: int | None
+    gid: int | None
+    owner: str | None
+    group: str | None
+    mode: str | None
+    writable: bool
+    executable: bool
+
+
+class LocalStoragePermissionsUpdate(BaseModel):
+    mode: str = Field(pattern=r"^0?[0-7]{3}$")
+    recursive: bool = False

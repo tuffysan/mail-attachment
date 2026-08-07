@@ -58,6 +58,11 @@ fi
 log "Updating source"
 git reset --hard "${REMOTE}/${BRANCH}"
 
+if [[ -f "./scripts/install-update-agent.sh" ]]; then
+  chmod +x ./scripts/install-update-agent.sh
+  ./scripts/install-update-agent.sh
+fi
+
 log "Building updated images"
 docker compose --env-file .env "${COMPOSE[@]}" build --pull
 

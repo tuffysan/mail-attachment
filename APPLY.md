@@ -1,20 +1,36 @@
-# Apply LXC update support
+# Apply Web Update Manager
 
-Copy the files over the repository, then commit:
+Copy the overlay over the repository.
+
+## Commit
 
 ```powershell
-git add scripts docs/LXC_UPDATES.md
-git commit -m "feat(installer): add LXC update and rollback commands"
+git add backend frontend scripts compose.yml docs/WEB_UPDATES.md
+git commit -m "feat(operations): add web-based LXC updates"
 git push origin main
 ```
 
-For an existing LXC:
+## One-time activation on an existing LXC
+
+The web update feature cannot update itself before the host-side agent has been
+installed. Run this once:
 
 ```bash
 pct enter 134
+
 cd /opt/mail-attachment-hub
 git pull --ff-only origin main
-chmod +x scripts/install-lxc-cli.sh
-./scripts/install-lxc-cli.sh
-mailhub update
+
+chmod +x scripts/install-update-agent.sh scripts/update-agent.sh scripts/lxc-update.sh
+./scripts/install-update-agent.sh
+
+docker compose \
+  --env-file .env \
+  -f compose.yml \
+  -f compose.override.lxc.yml \
+  up -d --build
 ```
+
+Reload the browser with Ctrl+F5 and open the Operations Dashboard.
+
+From then on, future GitHub changes can be installed from the web interface.

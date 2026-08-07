@@ -88,6 +88,7 @@ services:
       MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
       MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID:-common}
       STORAGE_RETRY_ATTEMPTS: ${STORAGE_RETRY_ATTEMPTS:-3}
+      UPDATE_CONTROL_DIR: /control
       TZ: ${TZ:-UTC}
     ports:
       - "${BACKEND_BIND_ADDRESS:-0.0.0.0}:${BACKEND_PORT:-8080}:8080"
@@ -109,6 +110,7 @@ services:
     volumes:
       - attachment_data:/data/attachments
       - routed_data:/data/routed
+      - /var/lib/mailhub-control:/control
     networks:
       - mailhub_internal
     security_opt:

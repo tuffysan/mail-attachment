@@ -120,3 +120,61 @@ select { width: 100%; border: 1px solid #334155; border-radius: 12px; padding: 1
 .activity-level.info { color:#bfdbfe; background:rgba(30,64,175,.35); }
 @media (max-width:900px) { .operations-columns { grid-template-columns:1fr; } }
 @media (max-width:640px) { .operations-summary { align-items:flex-start; flex-direction:column; } }
+
+
+.software-update-panel {
+  display: grid;
+  gap: 18px;
+}
+.update-version-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.update-version-grid > div {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid rgba(148,163,184,.16);
+  border-radius: 14px;
+  background: rgba(2,6,23,.28);
+}
+.update-version-grid span {
+  color: #94a3b8;
+  font-size: .78rem;
+}
+.update-version-grid strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+.update-commit-message {
+  margin: 0;
+}
+.update-progress {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(30,64,175,.18);
+  border: 1px solid rgba(96,165,250,.3);
+}
+.update-progress > span {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  border: 2px solid #60a5fa;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: update-spin .8s linear infinite;
+}
+.update-progress p {
+  margin: 0;
+}
+@keyframes update-spin {
+  to { transform: rotate(360deg); }
+}
+@media (max-width: 700px) {
+  .update-version-grid {
+    grid-template-columns: 1fr;
+  }
+}

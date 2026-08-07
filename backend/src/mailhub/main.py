@@ -15,6 +15,7 @@ from mailhub.api.admin import router as admin_router
 from mailhub.api.system import router as system_router
 from mailhub.api.setup import router as setup_router
 from mailhub.api.operations import router as operations_router
+from mailhub.api.updates import router as update_router
 from mailhub.auth.bootstrap import ensure_bootstrap_admin
 from mailhub.config import get_settings
 from mailhub.db import close_database, initialize_database
@@ -154,3 +155,4 @@ app.include_router(admin_router)
 app.include_router(system_router)
 app.include_router(setup_router)
 app.include_router(operations_router)
+app.include_router(update_router)

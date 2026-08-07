@@ -169,3 +169,25 @@ export interface OperationsDashboard {
     created_at: string
   }>
 }
+
+
+export interface UpdateStatus {
+  state:
+    | 'idle'
+    | 'unavailable'
+    | 'checking'
+    | 'up_to_date'
+    | 'update_available'
+    | 'updating'
+    | 'success'
+    | 'error'
+  installed_commit: string | null
+  latest_commit: string | null
+  update_available: boolean
+  latest_message: string | null
+  latest_date: string | null
+  checked_at: string | null
+  started_at: string | null
+  finished_at: string | null
+  message: string | null
+}
