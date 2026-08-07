@@ -221,3 +221,14 @@ select { width: 100%; border: 1px solid #334155; border-radius: 12px; padding: 1
 .wizard-actions {
   flex-wrap: wrap;
 }
+
+
+.simulation-results {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+.alert a {
+  color: #bfdbfe;
+  font-weight: 700;
+}

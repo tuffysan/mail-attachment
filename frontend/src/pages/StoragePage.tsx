@@ -62,6 +62,8 @@ export function StoragePage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busyId, setBusyId] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [permissionTarget, setPermissionTarget] = useState<StorageDestination | null>(null)
   const [permissions, setPermissions] = useState<LocalStoragePermissions | null>(null)
   const [permissionMode, setPermissionMode] = useState('0770')
@@ -73,40 +75,78 @@ export function StoragePage() {
   )
 
   async function reload() {
-    const [providerRows, destinationRows] = await Promise.all([
-      listStorageProviders(),
-      listManagedStorageDestinations(),
-    ])
-    setProviders(providerRows)
-    setDestinations(destinationRows)
+    setLoading(true)
+    try {
+      const [providerRows, destinationRows] = await Promise.all([
+        listStorageProviders(),
+        listManagedStorageDestinations(),
+      ])
+      setProviders(providerRows)
+      setDestinations(destinationRows)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    void reload().catch(() => setError('Lagringsmålen kunde inte läsas.'))
+    void reload().catch((caught) =>
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Lagringsmålen kunde inte läsas.',
+      ),
+    )
   }, [])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError('')
     setNotice('')
+
+    if (!name.trim()) {
+      setError('Destinationen måste ha ett namn.')
+      return
+    }
+
+    if (provider === 'local' && !basePath.trim()) {
+      setError('En lokal destination måste ha en sökväg.')
+      return
+    }
+
+    setCreating(true)
+
     try {
-      await createStorageDestination({
-        name,
+      const destination = await createStorageDestination({
+        name: name.trim(),
         provider,
-        base_path: basePath,
+        base_path: basePath.trim(),
         config,
         is_enabled: true,
       })
+
       setName('')
       setConfig({})
-      setNotice('Lagringsmålet sparades. Testa anslutningen innan det används.')
+
+      try {
+        const test = await testStorageDestination(destination.id)
+        setNotice(`${destination.name}: ${test.message}`)
+      } catch (caught) {
+        setError(
+          caught instanceof ApiError
+            ? `${destination.name} sparades men testet misslyckades: ${caught.message}`
+            : `${destination.name} sparades men anslutningstestet misslyckades.`,
+        )
+      }
+
       await reload()
     } catch (caught) {
       setError(
         caught instanceof ApiError
           ? caught.message
-          : 'Lagringsmålet kunde inte sparas.'
+          : 'Lagringsmålet kunde inte sparas.',
       )
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -181,6 +221,38 @@ export function StoragePage() {
     }
   }
 
+  async function removeDestination(destination: StorageDestination) {
+    if (
+      !window.confirm(
+        `Ta bort destinationen "${destination.name}"? Regler som använder destinationen kan påverkas.`,
+      )
+    ) {
+      return
+    }
+
+    setBusyId(destination.id)
+    setError('')
+    setNotice('')
+
+    try {
+      await deleteStorageDestination(destination.id)
+      if (permissionTarget?.id === destination.id) {
+        setPermissionTarget(null)
+        setPermissions(null)
+      }
+      setNotice(`Destinationen "${destination.name}" togs bort.`)
+      await reload()
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : 'Destinationen kunde inte tas bort.',
+      )
+    } finally {
+      setBusyId('')
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -243,7 +315,9 @@ export function StoragePage() {
               </div>
             ))}
 
-            <button>Spara destination</button>
+            <button disabled={creating || loading}>
+              {creating ? 'Sparar och testar…' : 'Spara och testa destination'}
+            </button>
           </form>
         </section>
 
@@ -255,6 +329,12 @@ export function StoragePage() {
           </h2>
 
           <div className="account-list">
+            {!destinations.length && !loading && (
+              <div className="empty-state">
+                Inga lagringsdestinationer är konfigurerade ännu.
+              </div>
+            )}
+
             {destinations.map(destination => (
               <article className="account-card" key={destination.id}>
                 <div>
@@ -311,20 +391,10 @@ export function StoragePage() {
 
                   <button
                     className="danger"
-                    onClick={async () => {
-                      try {
-                        await deleteStorageDestination(destination.id)
-                        await reload()
-                      } catch (caught) {
-                        setError(
-                          caught instanceof ApiError
-                            ? caught.message
-                            : 'Destinationen kunde inte tas bort.'
-                        )
-                      }
-                    }}
+                    disabled={busyId === destination.id}
+                    onClick={() => void removeDestination(destination)}
                   >
-                    Ta bort
+                    {busyId === destination.id ? 'Arbetar…' : 'Ta bort'}
                   </button>
                 </div>
               </article>
@@ -357,6 +427,14 @@ export function StoragePage() {
                 {permissions?.executable ? 'Ja' : 'Nej'}
               </p>
             </div>
+
+            {permissions && (!permissions.writable || !permissions.executable) && (
+              <div className="alert">
+                Mail Attachment Hub saknar full åtkomst till katalogen. Välj ett
+                lämpligt Unix mode och spara rättigheterna, och kör sedan
+                anslutningstestet igen.
+              </div>
+            )}
 
             <form onSubmit={savePermissions}>
               <label>Unix-rättigheter</label>
