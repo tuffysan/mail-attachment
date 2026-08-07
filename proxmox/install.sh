@@ -199,7 +199,7 @@ replace_env() {
 step "Installerar systempaket"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y ca-certificates curl git jq openssl iproute2
+apt-get install -y ca-certificates curl git jq openssl iproute2 util-linux
 
 step "Installerar Docker"
 if ! command -v docker >/dev/null 2>&1; then
@@ -218,28 +218,71 @@ echo "============================================================"
 echo " Installing MailHub Update Agent"
 echo "============================================================"
 
-if [[ ! -f scripts/install-update-agent.sh ]]; then
-  echo "Missing scripts/install-update-agent.sh" >&2
-  exit 1
-fi
+for required_script in \
+  scripts/install-update-agent.sh \
+  scripts/update-agent.sh \
+  scripts/lxc-update.sh
+do
+  if [[ ! -f "$required_script" ]]; then
+    echo "Required update-agent file is missing: $required_script" >&2
+    exit 1
+  fi
+done
 
 chmod +x \
   scripts/install-update-agent.sh \
   scripts/update-agent.sh \
   scripts/lxc-update.sh
 
+echo "Running scripts/install-update-agent.sh..."
 ./scripts/install-update-agent.sh
+
+systemctl daemon-reload
+systemctl enable --now mailhub-update-agent.path
+
+UPDATE_AGENT_ENABLED="$(systemctl is-enabled mailhub-update-agent.path 2>/dev/null || true)"
+UPDATE_AGENT_ACTIVE="$(systemctl is-active mailhub-update-agent.path 2>/dev/null || true)"
 
 echo
 echo "Update agent status:"
-systemctl is-enabled mailhub-update-agent.path
-systemctl is-active mailhub-update-agent.path
+echo "  enabled: ${UPDATE_AGENT_ENABLED}"
+echo "  active:  ${UPDATE_AGENT_ACTIVE}"
 
-# Install the host-side web update agent before Docker starts. This also creates
-# /var/lib/mailhub-control with ownership matching backend UID/GID 10001.
-if [[ -x "./scripts/install-update-agent.sh" ]]; then
-  ./scripts/install-update-agent.sh
+if [[ "$UPDATE_AGENT_ENABLED" != "enabled" ]]; then
+  echo "mailhub-update-agent.path was not enabled." >&2
+  exit 1
 fi
+
+if [[ "$UPDATE_AGENT_ACTIVE" != "active" ]]; then
+  echo "mailhub-update-agent.path is not active." >&2
+  systemctl --no-pager --full status mailhub-update-agent.path || true
+  exit 1
+fi
+
+if [[ ! -d /var/lib/mailhub-control ]]; then
+  echo "/var/lib/mailhub-control was not created." >&2
+  exit 1
+fi
+
+CONTROL_OWNER="$(stat -c '%u:%g' /var/lib/mailhub-control)"
+CONTROL_MODE="$(stat -c '%a' /var/lib/mailhub-control)"
+
+echo "  control owner: ${CONTROL_OWNER}"
+echo "  control mode:  ${CONTROL_MODE}"
+
+if [[ "$CONTROL_OWNER" != "10001:10001" ]]; then
+  echo "Wrong owner on /var/lib/mailhub-control: ${CONTROL_OWNER}" >&2
+  exit 1
+fi
+
+if ! setpriv --reuid=10001 --regid=10001 --clear-groups \
+  sh -c 'touch /var/lib/mailhub-control/.installer-write-test && rm -f /var/lib/mailhub-control/.installer-write-test'
+then
+  echo "/var/lib/mailhub-control is not writable by UID/GID 10001." >&2
+  exit 1
+fi
+
+echo "Update agent control directory: writable"
 
 cp .env.example .env
 
