@@ -42,15 +42,16 @@ print_credentials() {
   echo "============================================================"
   echo "Web UI:   http://${ip}:${WEB_PORT}"
   echo "API:      http://${ip}:${API_PORT}"
-  echo "Login:    ${ADMIN_EMAIL}"
-
+  local password=""
   if [[ -f "$CREDENTIALS_FILE" ]]; then
-    local password
     password="$(sed -n 's/^ADMIN_PASSWORD=//p' "$CREDENTIALS_FILE" | tail -1)"
-    echo "Password: ${password:-unknown}"
-  else
-    echo "Password: unavailable (${CREDENTIALS_FILE} saknas)"
   fi
+  if [[ -z "$password" && -f .env ]]; then
+    password="$(sed -n 's/^ADMIN_PASSWORD=//p' .env | tail -1)"
+  fi
+
+  echo "Admin email:    ${ADMIN_EMAIL}"
+  echo "Admin password: ${password:-unknown}"
 
   echo
   echo "LXC IP:   ${ip}"

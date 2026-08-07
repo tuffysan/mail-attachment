@@ -571,29 +571,52 @@ monitor_install_job() {
 show_result() {
   CURRENT_STEP="visar installationsinformation"
   log "$CURRENT_STEP"
+
   echo
   echo "============================================================"
   echo " Mail Attachment Hub installerades korrekt"
   echo "============================================================"
   echo "LXC-ID: ${CTID}"
   echo
+
+  local ip email password web_port api_port
+  ip="$(pct exec "$CTID" -- bash -lc "hostname -I 2>/dev/null | awk '{print \\$1}'" 2>/dev/null || true)"
+  email="$(pct exec "$CTID" -- bash -lc "sed -n 's/^ADMIN_EMAIL=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" 2>/dev/null || true)"
+  password="$(pct exec "$CTID" -- bash -lc "sed -n 's/^ADMIN_PASSWORD=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" 2>/dev/null || true)"
+  web_port="$(pct exec "$CTID" -- bash -lc "sed -n 's/^WEB_PORT=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" 2>/dev/null || true)"
+  api_port="$(pct exec "$CTID" -- bash -lc "sed -n 's/^API_PORT=//p' /root/mailhub-credentials.env 2>/dev/null | tail -1" 2>/dev/null || true)"
+
+  # Fallbacks if the credentials file is missing/incomplete.
+  [[ -n "$email" ]] || email="$(pct exec "$CTID" -- bash -lc "sed -n 's/^ADMIN_EMAIL=//p' /opt/mail-attachment-hub/.env 2>/dev/null | tail -1" 2>/dev/null || true)"
+  [[ -n "$password" ]] || password="$(pct exec "$CTID" -- bash -lc "sed -n 's/^ADMIN_PASSWORD=//p' /opt/mail-attachment-hub/.env 2>/dev/null | tail -1" 2>/dev/null || true)"
+  [[ -n "$web_port" ]] || web_port="${WEB_PORT}"
+  [[ -n "$api_port" ]] || api_port="${API_PORT}"
+
+  ip="${ip:-unknown}"
+  email="${email:-unknown}"
+  password="${password:-unknown}"
+
+  # Show the saved install summary when available, but credentials below are
+  # printed independently so a stale/missing summary can never hide them.
   if pct exec "$CTID" -- test -s /root/mailhub-install-info.txt >/dev/null 2>&1; then
     pct exec "$CTID" -- cat /root/mailhub-install-info.txt || true
-  else
-    local ip email password
-    ip="$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}' || true)"
-    email="$(pct exec "$CTID" -- sed -n 's/^ADMIN_EMAIL=//p' /root/mailhub-credentials.env 2>/dev/null || true)"
-    password="$(pct exec "$CTID" -- sed -n 's/^ADMIN_PASSWORD=//p' /root/mailhub-credentials.env 2>/dev/null || true)"
-    ip="${ip:-unknown}"; email="${email:-unknown}"; password="${password:-unknown}"
-    echo "IP:       ${ip}"
-    echo "Web UI:   http://${ip}:${WEB_PORT}"
-    echo "API:      http://${ip}:${API_PORT}"
-    echo "Login:    ${email}"
-    echo "Password: ${password}"
+    echo
   fi
+
+  echo "============================================================"
+  echo " ADMIN LOGIN"
+  echo "============================================================"
+  echo "Web UI:         http://${ip}:${web_port}"
+  echo "API:            http://${ip}:${api_port}"
+  echo "Admin email:    ${email}"
+  echo "Admin password: ${password}"
+  echo "============================================================"
   echo
-  echo "Credentials: pct exec ${CTID} -- mailhub credentials"
-  echo "Doctor:      pct exec ${CTID} -- mailhub doctor"
+  echo "Visa uppgifterna igen:"
+  echo "  pct exec ${CTID} -- mailhub credentials"
+  echo "  pct exec ${CTID} -- cat /root/mailhub-credentials.env"
+  echo
+  echo "Doctor: pct exec ${CTID} -- mailhub doctor"
   echo "============================================================"
 }
 

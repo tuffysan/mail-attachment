@@ -16,6 +16,9 @@ WEB_PORT="${WEB_PORT:-$(sed -n 's/^FRONTEND_PORT=//p' .env | tail -1)}"
 API_PORT="${API_PORT:-$(sed -n 's/^BACKEND_PORT=//p' .env | tail -1)}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-$(sed -n 's/^ADMIN_EMAIL=//p' .env | tail -1)}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(sed -n 's/^ADMIN_PASSWORD=//p' "$CREDENTIALS_FILE" 2>/dev/null | tail -1)}"
+if [[ -z "${ADMIN_PASSWORD:-}" ]]; then
+  ADMIN_PASSWORD="$(sed -n 's/^ADMIN_PASSWORD=//p' .env 2>/dev/null | tail -1)"
+fi
 
 WEB_PORT="${WEB_PORT:-3000}"
 API_PORT="${API_PORT:-8080}"
@@ -37,8 +40,8 @@ Web UI:    http://${IP}:${WEB_PORT}
 API:       http://${IP}:${API_PORT}
 
 Login:
-Email:     ${ADMIN_EMAIL}
-Password:  ${ADMIN_PASSWORD}
+Admin email:    ${ADMIN_EMAIL}
+Admin password: ${ADMIN_PASSWORD}
 
 Version:
 ${VERSION}
