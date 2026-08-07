@@ -110,7 +110,7 @@ services:
     volumes:
       - attachment_data:/data/attachments
       - routed_data:/data/routed
-      - /var/lib/mailhub-control:/control
+      - /var/lib/mailhub-control:/control:rw
     networks:
       - mailhub_internal
     security_opt:

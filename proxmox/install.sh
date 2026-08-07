@@ -212,6 +212,12 @@ rm -rf "$INSTALL_DIR"
 git clone --branch "$BRANCH" "https://github.com/${REPO}.git" "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
+# Install the host-side web update agent before Docker starts. This also creates
+# /var/lib/mailhub-control with ownership matching backend UID/GID 10001.
+if [[ -x "./scripts/install-update-agent.sh" ]]; then
+  ./scripts/install-update-agent.sh
+fi
+
 cp .env.example .env
 
 POSTGRES_PASSWORD="$(openssl rand -base64 36 | tr -d '\n' | tr '/+' '_-')"

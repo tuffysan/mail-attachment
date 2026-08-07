@@ -1,10 +1,10 @@
-# Apply storage owner fix
+# Apply Web Update Agent permission fix
 
-Copy the files to the repository and push them.
+Copy all files over the repository.
 
 ```powershell
-git add compose.override.lxc.yml scripts/fix-storage-permissions.sh scripts/storage-permissions-status.sh docs/STORAGE_PERMISSION_REPAIR.md
-git commit -m "fix(storage): initialize local volume ownership for mailhub user"
+git add scripts compose.yml proxmox/install.sh docs/WEB_UPDATE_AGENT_REPAIR.md
+git commit -m "fix(update): make LXC update control directory writable"
 git push origin main
 ```
 
@@ -16,25 +16,14 @@ pct enter 134
 cd /opt/mail-attachment-hub
 git pull --ff-only origin main
 
-chmod +x scripts/fix-storage-permissions.sh
-chmod +x scripts/storage-permissions-status.sh
-
-./scripts/fix-storage-permissions.sh
+chmod +x scripts/repair-update-agent.sh
+./scripts/repair-update-agent.sh
 ```
 
-Then reload the web application and test **Local routed files**.
+Reload the browser with Ctrl+F5 and open:
 
-## Future starts and updates
-
-Use both compose files:
-
-```bash
-docker compose \
-  --env-file .env \
-  -f compose.yml \
-  -f compose.override.lxc.yml \
-  up -d
+```text
+Administration -> Operations Dashboard -> GitHub-uppdatering
 ```
 
-The `storage-init` service will run before backend/worker and ensure the named
-volumes are owned by UID/GID 10001.
+Click **Kontrollera GitHub**.

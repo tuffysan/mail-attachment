@@ -61,7 +61,7 @@ json_status() {
       message: ($message | select(length > 0))
     }' > "$tmp"
 
-  chmod 0644 "$tmp"
+  chmod 0660 "$tmp"
   chown 10001:10001 "$tmp" 2>/dev/null || true
   mv "$tmp" "$STATUS_FILE"
 }
