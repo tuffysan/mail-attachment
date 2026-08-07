@@ -61,6 +61,9 @@ git reset --hard "${REMOTE}/${BRANCH}"
 log "Building updated images"
 docker compose --env-file .env "${COMPOSE[@]}" build --pull
 
+log "Preparing storage permissions"
+docker compose   --env-file .env   "${COMPOSE[@]}"   run --rm --no-deps storage-init
+
 log "Starting updated stack"
 docker compose --env-file .env "${COMPOSE[@]}" up -d --remove-orphans
 
@@ -103,6 +106,10 @@ if [[ "$frontend_ok" != 1 ]]; then
   echo "Rollback with: mailhub rollback ${CURRENT_COMMIT}"
   exit 1
 fi
+
+log "Checking storage permissions"
+chmod +x ./scripts/storage-self-test.sh
+./scripts/storage-self-test.sh
 
 docker image prune -f >/dev/null 2>&1 || true
 

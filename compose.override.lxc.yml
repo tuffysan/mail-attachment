@@ -7,12 +7,30 @@ services:
       - sh
       - -ec
       - |
-        echo "Fixing Mail Attachment Hub storage ownership..."
+        echo "Preparing Mail Attachment Hub storage..."
         mkdir -p /data/attachments /data/routed
+
+        # All application containers run as UID/GID 10001.
         chown -R 10001:10001 /data/attachments /data/routed
-        chmod 0770 /data/attachments /data/routed
+
+        # Directories need execute/traverse permission. Existing application
+        # files need read/write permission for the MailHub user.
+        find /data/attachments /data/routed -type d -exec chmod 0770 {} +
+        find /data/attachments /data/routed -type f -exec chmod 0660 {} +
+
         echo "Storage ownership:"
         ls -ldn /data/attachments /data/routed
+
+        test "$(stat -c '%u:%g' /data/attachments)" = "10001:10001"
+        test "$(stat -c '%u:%g' /data/routed)" = "10001:10001"
+
+        touch /data/attachments/.mailhub-storage-init-test
+        touch /data/routed/.mailhub-storage-init-test
+        rm -f \
+          /data/attachments/.mailhub-storage-init-test \
+          /data/routed/.mailhub-storage-init-test
+
+        echo "Storage init: OK"
     volumes:
       - attachment_data:/data/attachments
       - routed_data:/data/routed

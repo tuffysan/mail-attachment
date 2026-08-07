@@ -221,7 +221,9 @@ echo "============================================================"
 for required_script in \
   scripts/install-update-agent.sh \
   scripts/update-agent.sh \
-  scripts/lxc-update.sh
+  scripts/lxc-update.sh \
+  scripts/storage-self-test.sh \
+  scripts/repair-storage-permissions.sh
 do
   if [[ ! -f "$required_script" ]]; then
     echo "Required update-agent file is missing: $required_script" >&2
@@ -232,7 +234,9 @@ done
 chmod +x \
   scripts/install-update-agent.sh \
   scripts/update-agent.sh \
-  scripts/lxc-update.sh
+  scripts/lxc-update.sh \
+  scripts/storage-self-test.sh \
+  scripts/repair-storage-permissions.sh
 
 echo "Running scripts/install-update-agent.sh..."
 ./scripts/install-update-agent.sh
@@ -311,6 +315,9 @@ chmod 600 /root/mailhub-credentials.env
 step "Bygger images"
 docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml build --pull
 
+step "Förbereder lagring"
+docker compose   --env-file .env   -f compose.yml   -f compose.override.lxc.yml   run --rm --no-deps storage-init
+
 step "Startar tjänster"
 docker compose --env-file .env -f compose.yml -f compose.override.lxc.yml up -d
 
@@ -337,89 +344,8 @@ docker compose \
   '
 
 
-step "Självtestar GitHub update-agent"
-
-# Send the exact kind of request the backend/UI uses.
-REQUEST_TMP="/var/lib/mailhub-control/.request-installer.tmp"
-jq -n \
-  --arg requested_at "$(date --iso-8601=seconds)" \
-  '{action:"check", requested_at:$requested_at}' > "$REQUEST_TMP"
-chown 10001:10001 "$REQUEST_TMP"
-chmod 0660 "$REQUEST_TMP"
-mv -f "$REQUEST_TMP" /var/lib/mailhub-control/request.json
-
-agent_done=0
-for attempt in $(seq 1 45); do
-  if [[ ! -f /var/lib/mailhub-control/request.json ]] &&
-     [[ -s /var/lib/mailhub-control/status.json ]] &&
-     jq -e . /var/lib/mailhub-control/status.json >/dev/null 2>&1; then
-    agent_state="$(jq -r '.state // empty' /var/lib/mailhub-control/status.json)"
-    if [[ "$agent_state" != "checking" && "$agent_state" != "idle" && -n "$agent_state" ]]; then
-      agent_done=1
-      break
-    fi
-  fi
-
-  printf '\rUpdate-agent %02d/45' "$attempt"
-  sleep 1
-done
-echo
-
-if [[ "$agent_done" != 1 ]]; then
-  echo "Update-agent self-test timed out." >&2
-  echo "systemd status:" >&2
-  systemctl --no-pager --full status mailhub-update-agent.path || true
-  systemctl --no-pager --full status mailhub-update-agent.service || true
-  echo "status.json:" >&2
-  cat /var/lib/mailhub-control/status.json 2>/dev/null || true
-  echo "update.log:" >&2
-  tail -100 /var/lib/mailhub-control/update.log 2>/dev/null || true
-  exit 1
-fi
-
-case "$agent_state" in
-  up_to_date|update_available|success)
-    ;;
-  error)
-    echo "Update-agent svarade men GitHub-kontrollen misslyckades." >&2
-    cat /var/lib/mailhub-control/status.json | jq . >&2 || true
-    tail -100 /var/lib/mailhub-control/update.log >&2 || true
-    exit 1
-    ;;
-  *)
-    echo "Oväntad update-agent status: $agent_state" >&2
-    cat /var/lib/mailhub-control/status.json | jq . >&2 || true
-    exit 1
-    ;;
-esac
-
-# Verify that backend sees the exact same non-empty valid status.
-docker compose \
-  --env-file .env \
-  -f compose.yml \
-  -f compose.override.lxc.yml \
-  exec -T backend python - <<'PY'
-import json
-from pathlib import Path
-
-path = Path("/control/status.json")
-if not path.exists():
-    raise SystemExit("/control/status.json saknas")
-
-if path.stat().st_size <= 0:
-    raise SystemExit("/control/status.json är tom")
-
-data = json.loads(path.read_text(encoding="utf-8"))
-state = data.get("state")
-
-if state not in {"up_to_date", "update_available", "success"}:
-    raise SystemExit(f"Oväntad update-agent state i backend: {state!r}")
-
-print("Update agent end-to-end: OK")
-print("State:", state)
-print("Installed:", data.get("installed_commit"))
-print("Latest:", data.get("latest_commit"))
-PY
+step "Verifierar lagringsrättigheter"
+./scripts/storage-self-test.sh
 
 
 step "Väntar på webbgränssnitt och API"
