@@ -10,6 +10,7 @@ from mailhub.db import close_database, initialize_database
 from mailhub.db.models import EmailAccount
 from mailhub.db.session import get_session_factory
 from mailhub.logging_config import configure_logging
+from mailhub.mail.schedule import account_sync_due
 from mailhub.mail.sync import sync_account
 
 settings = get_settings()
@@ -21,11 +22,19 @@ WORKER_NAME = "mail-sync"
 async def run_once() -> None:
     factory = get_session_factory()
     async with factory() as session:
-        ids = list(
+        accounts = list(
             await session.scalars(
-                select(EmailAccount.id).where(EmailAccount.is_enabled.is_(True))
+                select(EmailAccount).where(EmailAccount.is_enabled.is_(True))
             )
         )
+        ids = [
+            account.id
+            for account in accounts
+            if account_sync_due(
+                account,
+                settings.sync_interval_seconds,
+            )
+        ]
 
     for account_id in ids:
         if lifecycle_manager.shutdown_requested:
@@ -84,7 +93,7 @@ async def main() -> None:
             try:
                 await asyncio.wait_for(
                     lifecycle_manager.wait_for_shutdown(),
-                    timeout=settings.sync_interval_seconds,
+                    timeout=min(settings.sync_interval_seconds, 60),
                 )
             except TimeoutError:
                 worker_registry.heartbeat(WORKER_NAME)

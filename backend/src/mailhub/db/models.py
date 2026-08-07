@@ -42,6 +42,7 @@ class EmailAccount(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     access_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_uid: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sync_interval_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_test_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     last_test_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 

@@ -108,8 +108,37 @@ export function testEmailAccount(id: string): Promise<ConnectionTestResponse> {
   return request<ConnectionTestResponse>(`/api/v1/email-accounts/${id}/test`, { method: 'POST' })
 }
 
-export function syncEmailAccount(id: string): Promise<{status:string;messages_created:number;attachments_created:number}> {
-  return request(`/api/v1/email-accounts/${id}/sync`, { method: 'POST' })
+export function syncEmailAccount(id: string) {
+  return request<import('./types').ManualSyncResponse>(
+    `/api/v1/email-accounts/${id}/sync`,
+    { method: 'POST' },
+  )
+}
+
+export function retryEmailAccountSync(id: string) {
+  return request<import('./types').ManualSyncResponse>(
+    `/api/v1/email-accounts/${id}/sync/retry`,
+    { method: 'POST' },
+  )
+}
+
+export function listEmailAccountSyncRuns(id: string, limit = 20) {
+  return request<import('./types').SyncRun[]>(
+    `/api/v1/email-accounts/${id}/sync-runs?limit=${limit}`,
+  )
+}
+
+export function updateEmailAccountSchedule(
+  id: string,
+  payload: { sync_interval_seconds: number | null; is_enabled?: boolean },
+) {
+  return request<import('./types').EmailAccount>(
+    `/api/v1/email-accounts/${id}/schedule`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+  )
 }
 
 export function startOAuth(provider: 'google' | 'microsoft'): Promise<{authorization_url:string}> {

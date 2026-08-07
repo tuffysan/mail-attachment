@@ -41,6 +41,8 @@ class EmailAccountResponse(BaseModel):
     oauth_provider: str | None
     last_test_status: str | None
     last_test_message: str | None
+    last_sync_at: datetime | None
+    sync_interval_seconds: int | None
     created_at: datetime
     updated_at: datetime
 
@@ -59,3 +61,26 @@ class EmailAccountConnectionTestRequest(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
     mailbox: str = Field(default="INBOX", min_length=1, max_length=255)
     use_ssl: bool = True
+
+
+class EmailAccountScheduleUpdate(BaseModel):
+    sync_interval_seconds: int | None = Field(
+        default=None,
+        ge=60,
+        le=86400,
+        description="Per-account sync interval. Null uses the global worker interval.",
+    )
+    is_enabled: bool | None = None
+
+
+class SyncRunResponse(BaseModel):
+    id: str
+    email_account_id: str
+    status: str
+    attempt: int
+    started_at: datetime
+    finished_at: datetime | None
+    messages_seen: int
+    messages_created: int
+    attachments_created: int
+    error_message: str | None

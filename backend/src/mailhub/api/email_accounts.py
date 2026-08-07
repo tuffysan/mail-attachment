@@ -2,12 +2,12 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mailhub.auth.dependencies import get_current_user
 from mailhub.config import Settings, get_settings
-from mailhub.db.models import EmailAccount
+from mailhub.db.models import EmailAccount, SyncRun
 from mailhub.db.session import get_session
 from mailhub.mail.credentials import resolve_mail_credential
 from mailhub.mail.crypto import CredentialCipher
@@ -17,7 +17,9 @@ from mailhub.mail.schemas import (
     EmailAccountConnectionTestRequest,
     EmailAccountCreate,
     EmailAccountResponse,
+    EmailAccountScheduleUpdate,
     EmailAccountUpdate,
+    SyncRunResponse,
 )
 
 router = APIRouter(
@@ -42,6 +44,8 @@ def _response(account: EmailAccount) -> EmailAccountResponse:
         oauth_provider=account.oauth_provider,
         last_test_status=account.last_test_status,
         last_test_message=account.last_test_message,
+        last_sync_at=account.last_sync_at,
+        sync_interval_seconds=account.sync_interval_seconds,
         created_at=account.created_at,
         updated_at=account.updated_at,
     )
@@ -157,6 +161,63 @@ async def update_account(
     await session.refresh(account)
     return _response(account)
 
+
+
+
+def _sync_run_response(run: SyncRun) -> SyncRunResponse:
+    return SyncRunResponse(
+        id=str(run.id),
+        email_account_id=str(run.email_account_id),
+        status=run.status,
+        attempt=run.attempt,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+        messages_seen=run.messages_seen,
+        messages_created=run.messages_created,
+        attachments_created=run.attachments_created,
+        error_message=run.error_message,
+    )
+
+
+@router.put("/{account_id}/schedule", response_model=EmailAccountResponse)
+async def update_account_schedule(
+    account_id: UUID,
+    request: EmailAccountScheduleUpdate,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> EmailAccountResponse:
+    account = await _get_account(account_id, session)
+
+    if request.sync_interval_seconds is not None:
+        account.sync_interval_seconds = request.sync_interval_seconds
+    elif "sync_interval_seconds" in request.model_fields_set:
+        account.sync_interval_seconds = None
+
+    if request.is_enabled is not None:
+        account.is_enabled = request.is_enabled
+
+    await session.commit()
+    await session.refresh(account)
+    return _response(account)
+
+
+@router.get("/{account_id}/sync-runs", response_model=list[SyncRunResponse])
+async def list_account_sync_runs(
+    account_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    limit: int = 20,
+) -> list[SyncRunResponse]:
+    await _get_account(account_id, session)
+
+    rows = (
+        await session.scalars(
+            select(SyncRun)
+            .where(SyncRun.email_account_id == account_id)
+            .order_by(desc(SyncRun.started_at))
+            .limit(max(1, min(limit, 100)))
+        )
+    ).all()
+
+    return [_sync_run_response(run) for run in rows]
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_account(

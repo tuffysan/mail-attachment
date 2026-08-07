@@ -36,6 +36,8 @@ export interface EmailAccount {
   oauth_provider: 'google' | 'microsoft' | string | null
   last_test_status: string | null
   last_test_message: string | null
+  last_sync_at: string | null
+  sync_interval_seconds: number | null
   created_at: string
   updated_at: string
 }
@@ -60,6 +62,31 @@ export interface EmailAccountConnectionTest {
   password: string
   mailbox: string
   use_ssl: boolean
+}
+
+
+
+export interface SyncRun {
+  id: string
+  email_account_id: string
+  status: 'running' | 'succeeded' | 'failed' | string
+  attempt: number
+  started_at: string
+  finished_at: string | null
+  messages_seen: number
+  messages_created: number
+  attachments_created: number
+  error_message: string | null
+}
+
+export interface ManualSyncResponse {
+  run_id: string
+  status: string
+  attempt: number
+  messages_seen: number
+  messages_created: number
+  attachments_created: number
+  error_message: string | null
 }
 
 export interface ConnectionTestResponse {

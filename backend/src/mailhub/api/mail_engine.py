@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from mailhub.auth.dependencies import get_current_user
 from mailhub.config import Settings, get_settings
-from mailhub.db.models import ActivityEvent, EmailAccount, MailMessage
+from mailhub.db.models import ActivityEvent, EmailAccount, MailMessage, SyncRun
 from mailhub.db.session import get_session
 from mailhub.mail.crypto import CredentialCipher
 from mailhub.mail.oauth import (
@@ -32,6 +32,16 @@ router = APIRouter(prefix="/api/v1", tags=["mail engine"])
 
 class OAuthStart(BaseModel):
     authorization_url: str
+
+
+class ManualSyncResponse(BaseModel):
+    run_id: str
+    status: str
+    attempt: int
+    messages_seen: int
+    messages_created: int
+    attachments_created: int
+    error_message: str | None = None
 
 
 @router.get(
@@ -245,6 +255,7 @@ async def oauth_callback(
 
 @router.post(
     "/email-accounts/{account_id}/sync",
+    response_model=ManualSyncResponse,
     dependencies=[Depends(get_current_user)],
 )
 async def manual_sync(
@@ -263,12 +274,61 @@ async def manual_sync(
             detail=run.error_message or "Sync failed",
         )
 
-    return {
-        "status": run.status,
-        "messages_created": run.messages_created,
-        "attachments_created": run.attachments_created,
-    }
+    return ManualSyncResponse(
+        run_id=str(run.id),
+        status=run.status,
+        attempt=run.attempt,
+        messages_seen=run.messages_seen,
+        messages_created=run.messages_created,
+        attachments_created=run.attachments_created,
+        error_message=run.error_message,
+    )
 
+
+
+
+@router.post(
+    "/email-accounts/{account_id}/sync/retry",
+    response_model=ManualSyncResponse,
+    dependencies=[Depends(get_current_user)],
+)
+async def retry_sync(
+    account_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ManualSyncResponse:
+    account = await session.get(EmailAccount, account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Email account not found")
+
+    latest_failed = await session.scalar(
+        select(SyncRun)
+        .where(
+            SyncRun.email_account_id == account_id,
+            SyncRun.status == "failed",
+        )
+        .order_by(desc(SyncRun.started_at))
+        .limit(1)
+    )
+
+    attempt = (latest_failed.attempt + 1) if latest_failed else 1
+    run = await sync_account(account_id, session, settings, attempt=attempt)
+
+    if run.status != "succeeded":
+        raise HTTPException(
+            status_code=422,
+            detail=run.error_message or "Retry failed",
+        )
+
+    return ManualSyncResponse(
+        run_id=str(run.id),
+        status=run.status,
+        attempt=run.attempt,
+        messages_seen=run.messages_seen,
+        messages_created=run.messages_created,
+        attachments_created=run.attachments_created,
+        error_message=run.error_message,
+    )
 
 @router.get("/messages", dependencies=[Depends(get_current_user)])
 async def messages(

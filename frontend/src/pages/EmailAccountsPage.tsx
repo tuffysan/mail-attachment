@@ -6,12 +6,15 @@ import {
   createEmailAccount,
   deleteEmailAccount,
   listEmailAccounts,
+  listEmailAccountSyncRuns,
+  retryEmailAccountSync,
   startOAuth,
   syncEmailAccount,
   testEmailAccount,
+  updateEmailAccountSchedule,
   validateEmailAccount,
 } from '../api'
-import type { EmailAccount, EmailAccountCreate } from '../types'
+import type { EmailAccount, EmailAccountCreate, SyncRun } from '../types'
 
 const emptyForm: EmailAccountCreate = {
   name: '',
@@ -25,6 +28,31 @@ const emptyForm: EmailAccountCreate = {
   is_enabled: true,
 }
 
+
+function formatSyncDate(value: string | null): string {
+  if (!value) return 'Aldrig'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  return new Intl.DateTimeFormat('sv-SE', {
+    dateStyle: 'short',
+    timeStyle: 'medium',
+  }).format(date)
+}
+
+const syncIntervals = [
+  { value: '', label: 'Global standard' },
+  { value: '60', label: 'Varje minut' },
+  { value: '300', label: 'Var 5:e minut' },
+  { value: '900', label: 'Var 15:e minut' },
+  { value: '1800', label: 'Var 30:e minut' },
+  { value: '3600', label: 'Varje timme' },
+  { value: '21600', label: 'Var 6:e timme' },
+  { value: '43200', label: 'Var 12:e timme' },
+  { value: '86400', label: 'En gång per dygn' },
+]
+
 export function EmailAccountsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -36,6 +64,8 @@ export function EmailAccountsPage() {
   const [validating, setValidating] = useState(false)
   const [validated, setValidated] = useState(false)
   const [activeAccountId, setActiveAccountId] = useState('')
+  const [historyOpenId, setHistoryOpenId] = useState('')
+  const [historyByAccount, setHistoryByAccount] = useState<Record<string, SyncRun[]>>({})
 
   async function reload() {
     try {
@@ -194,6 +224,116 @@ export function EmailAccountsPage() {
       setActiveAccountId('')
     }
   }
+
+
+async function loadHistory(account: EmailAccount) {
+  if (historyOpenId === account.id) {
+    setHistoryOpenId('')
+    return
+  }
+
+  setActiveAccountId(account.id)
+  setError('')
+
+  try {
+    const rows = await listEmailAccountSyncRuns(account.id)
+    setHistoryByAccount(current => ({
+      ...current,
+      [account.id]: rows,
+    }))
+    setHistoryOpenId(account.id)
+  } catch (caught) {
+    setError(
+      caught instanceof ApiError
+        ? `${account.name}: ${caught.message}`
+        : 'Synkhistoriken kunde inte läsas.',
+    )
+  } finally {
+    setActiveAccountId('')
+  }
+}
+
+async function saveSchedule(
+  account: EmailAccount,
+  rawValue: string,
+) {
+  setActiveAccountId(account.id)
+  setError('')
+  setNotice('')
+
+  try {
+    await updateEmailAccountSchedule(account.id, {
+      sync_interval_seconds: rawValue === '' ? null : Number(rawValue),
+    })
+    setNotice(`${account.name}: synkschemat uppdaterades.`)
+    await reload()
+  } catch (caught) {
+    setError(
+      caught instanceof ApiError
+        ? `${account.name}: ${caught.message}`
+        : 'Synkschemat kunde inte sparas.',
+    )
+  } finally {
+    setActiveAccountId('')
+  }
+}
+
+async function toggleAccount(account: EmailAccount) {
+  setActiveAccountId(account.id)
+  setError('')
+  setNotice('')
+
+  try {
+    await updateEmailAccountSchedule(account.id, {
+      sync_interval_seconds: account.sync_interval_seconds,
+      is_enabled: !account.is_enabled,
+    })
+    setNotice(
+      `${account.name}: automatisk synk ${
+        account.is_enabled ? 'pausades' : 'aktiverades'
+      }.`,
+    )
+    await reload()
+  } catch (caught) {
+    setError(
+      caught instanceof ApiError
+        ? `${account.name}: ${caught.message}`
+        : 'Kontots synkstatus kunde inte ändras.',
+    )
+  } finally {
+    setActiveAccountId('')
+  }
+}
+
+async function retrySync(account: EmailAccount) {
+  setActiveAccountId(account.id)
+  setError('')
+  setNotice('')
+
+  try {
+    const result = await retryEmailAccountSync(account.id)
+    setNotice(
+      `${account.name}: retry lyckades på försök ${result.attempt}. ` +
+        `${result.messages_created} nya meddelanden och ` +
+        `${result.attachments_created} bilagor.`,
+    )
+    const rows = await listEmailAccountSyncRuns(account.id)
+    setHistoryByAccount(current => ({
+      ...current,
+      [account.id]: rows,
+    }))
+    setHistoryOpenId(account.id)
+    await reload()
+  } catch (caught) {
+    setError(
+      caught instanceof ApiError
+        ? `${account.name}: ${caught.message}`
+        : 'Retry av synkronisering misslyckades.',
+    )
+  } finally {
+    setActiveAccountId('')
+  }
+}
 
   async function remove(account: EmailAccount) {
     if (!window.confirm(`Ta bort e-postkontot ${account.name}?`)) {
@@ -428,30 +568,116 @@ export function EmailAccountsPage() {
                     )}
                   </div>
 
-                  <div className="card-actions">
-                    <button
-                      className="secondary"
-                      disabled={isActive}
-                      onClick={() => void testAccount(account)}
-                    >
-                      {isActive ? 'Arbetar…' : 'Testa'}
-                    </button>
+                  <div className="email-account-controls">
+                    <div className="sync-schedule">
+                      <label htmlFor={`sync-${account.id}`}>Automatisk synk</label>
+                      <select
+                        id={`sync-${account.id}`}
+                        disabled={isActive || !account.is_enabled}
+                        value={account.sync_interval_seconds ?? ''}
+                        onChange={event =>
+                          void saveSchedule(account, event.target.value)
+                        }
+                      >
+                        {syncIntervals.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <small>
+                        Senast: {formatSyncDate(account.last_sync_at)}
+                      </small>
+                    </div>
 
-                    <button
-                      className="secondary"
-                      disabled={isActive}
-                      onClick={() => void syncAccount(account)}
-                    >
-                      {isActive ? 'Arbetar…' : 'Synkronisera'}
-                    </button>
+                    <div className="card-actions">
+                      <button
+                        className="secondary"
+                        disabled={isActive}
+                        onClick={() => void testAccount(account)}
+                      >
+                        {isActive ? 'Arbetar…' : 'Testa'}
+                      </button>
 
-                    <button
-                      className="danger"
-                      disabled={isActive}
-                      onClick={() => void remove(account)}
-                    >
-                      Ta bort
-                    </button>
+                      <button
+                        className="secondary"
+                        disabled={isActive || !account.is_enabled}
+                        onClick={() => void syncAccount(account)}
+                      >
+                        {isActive ? 'Arbetar…' : 'Synka nu'}
+                      </button>
+
+                      <button
+                        className="secondary"
+                        disabled={isActive}
+                        onClick={() => void loadHistory(account)}
+                      >
+                        {historyOpenId === account.id ? 'Dölj historik' : 'Historik'}
+                      </button>
+
+                      <button
+                        className="secondary"
+                        disabled={isActive}
+                        onClick={() => void toggleAccount(account)}
+                      >
+                        {account.is_enabled ? 'Pausa auto-sync' : 'Aktivera auto-sync'}
+                      </button>
+
+                      <button
+                        className="danger"
+                        disabled={isActive}
+                        onClick={() => void remove(account)}
+                      >
+                        Ta bort
+                      </button>
+                    </div>
+
+                    {historyOpenId === account.id && (
+                      <div className="sync-history">
+                        {(historyByAccount[account.id] ?? []).length === 0 ? (
+                          <p className="muted">Ingen synkhistorik ännu.</p>
+                        ) : (
+                          (historyByAccount[account.id] ?? []).map(run => (
+                            <div className="sync-history-row" key={run.id}>
+                              <div>
+                                <strong>{formatSyncDate(run.started_at)}</strong>
+                                <span>
+                                  Försök {run.attempt} · {run.messages_seen} lästa ·{' '}
+                                  {run.messages_created} nya · {run.attachments_created} bilagor
+                                </span>
+                                {run.error_message && (
+                                  <small className="sync-error">{run.error_message}</small>
+                                )}
+                              </div>
+
+                              <div className="sync-history-actions">
+                                <span
+                                  className={`status-pill ${
+                                    run.status === 'succeeded'
+                                      ? 'ok'
+                                      : run.status === 'failed'
+                                        ? 'failed'
+                                        : 'pending'
+                                  }`}
+                                >
+                                  {run.status}
+                                </span>
+
+                                {run.status === 'failed' && (
+                                  <button
+                                    className="secondary"
+                                    disabled={isActive}
+                                    onClick={() => void retrySync(account)}
+                                  >
+                                    Försök igen
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
                 </article>
               )
