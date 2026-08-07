@@ -1,40 +1,40 @@
-# Fix frontend build after local-storage permissions update
+# Apply storage owner fix
 
-This overlay restores the missing frontend exports used by `StoragePage.tsx`.
-
-## Copy to repository
+Copy the files to the repository and push them.
 
 ```powershell
-$Source = "C:\Temp\mail-attachment-hub-storage-frontend-build-fix"
-$Repo   = "C:\Git\mail-attachment"
-
-Get-ChildItem $Source -Force |
-  Where-Object { $_.Name -ne "APPLY.md" } |
-  Copy-Item -Destination $Repo -Recurse -Force
-
-Set-Location $Repo
-
-git add frontend/src/api.ts frontend/src/types.ts frontend/src/pages/StoragePage.tsx
-git commit -m "fix(frontend): restore local storage permission exports"
+git add compose.override.lxc.yml scripts/fix-storage-permissions.sh scripts/storage-permissions-status.sh docs/STORAGE_PERMISSION_REPAIR.md
+git commit -m "fix(storage): initialize local volume ownership for mailhub user"
 git push origin main
 ```
 
-## Existing LXC
+## Repair existing LXC 134
 
 ```bash
 pct enter 134
+
 cd /opt/mail-attachment-hub
 git pull --ff-only origin main
 
-docker compose \
-  --env-file .env \
-  -f compose.yml \
-  -f compose.override.lxc.yml \
-  build frontend
+chmod +x scripts/fix-storage-permissions.sh
+chmod +x scripts/storage-permissions-status.sh
 
+./scripts/fix-storage-permissions.sh
+```
+
+Then reload the web application and test **Local routed files**.
+
+## Future starts and updates
+
+Use both compose files:
+
+```bash
 docker compose \
   --env-file .env \
   -f compose.yml \
   -f compose.override.lxc.yml \
-  up -d frontend
+  up -d
 ```
+
+The `storage-init` service will run before backend/worker and ensure the named
+volumes are owned by UID/GID 10001.

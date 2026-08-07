@@ -1,7 +1,35 @@
 services:
+  storage-init:
+    image: busybox:1.37
+    restart: "no"
+    user: "0:0"
+    command:
+      - sh
+      - -ec
+      - |
+        echo "Fixing Mail Attachment Hub storage ownership..."
+        mkdir -p /data/attachments /data/routed
+        chown -R 10001:10001 /data/attachments /data/routed
+        chmod 0770 /data/attachments /data/routed
+        echo "Storage ownership:"
+        ls -ldn /data/attachments /data/routed
+    volumes:
+      - attachment_data:/data/attachments
+      - routed_data:/data/routed
+    networks:
+      - mailhub_internal
+
   backend:
     ports:
       - "${BACKEND_BIND_ADDRESS:-0.0.0.0}:${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+
+  worker:
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
 
   frontend:
     ports:
