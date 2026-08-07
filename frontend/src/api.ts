@@ -333,3 +333,20 @@ export function restoreBackup(backupId: string, confirmation: string) {
     }),
   })
 }
+
+
+export function changePassword(payload: {
+  current_password: string
+  new_password: string
+}) {
+  return request<void>('/api/v1/auth/password', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function getAuditLog(limit = 100) {
+  return request<import('./types').AuditLogItem[]>(
+    `/api/v1/auth/audit?limit=${limit}`,
+  )
+}

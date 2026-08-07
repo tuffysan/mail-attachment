@@ -26,10 +26,14 @@ async def get_current_user(
     if credentials is None:
         raise unauthorized
     try:
-        user_id = decode_access_token(credentials.credentials, settings)
+        user_id, token_version = decode_access_token(credentials.credentials, settings)
     except (jwt.InvalidTokenError, ValueError):
         raise unauthorized from None
     user = await session.get(User, user_id)
-    if user is None or not user.is_active:
+    if (
+        user is None
+        or not user.is_active
+        or user.token_version != token_version
+    ):
         raise unauthorized
     return user

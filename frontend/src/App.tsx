@@ -10,6 +10,7 @@ import { SetupWizardPage } from './pages/SetupWizardPage'
 import { SetupGuard } from './components/SetupGuard'
 import { GoogleOAuthSetupPage } from './pages/GoogleOAuthSetupPage'
 import { BackupsPage } from './pages/BackupsPage'
+import { SecurityPage } from './pages/SecurityPage'
 
 export function App() {
   return (
@@ -24,6 +25,7 @@ export function App() {
         <Route path="/admin" element={<ProtectedRoute><SetupGuard><AdminPage /></SetupGuard></ProtectedRoute>} />
         <Route path="/admin/google-oauth" element={<ProtectedRoute><SetupGuard><GoogleOAuthSetupPage /></SetupGuard></ProtectedRoute>} />
         <Route path="/admin/backups" element={<ProtectedRoute><SetupGuard><BackupsPage /></SetupGuard></ProtectedRoute>} />
+        <Route path="/security" element={<ProtectedRoute><SetupGuard><SecurityPage /></SetupGuard></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

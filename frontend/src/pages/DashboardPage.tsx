@@ -134,6 +134,11 @@ export function DashboardPage() {
               <span>Destinationer, anslutningstest och lokala rättigheter.</span>
             </Link>
 
+            <Link className="quick-action-card" to="/security">
+              <strong>Säkerhet</strong>
+              <span>Lösenord, sessioner och säkerhetshändelser.</span>
+            </Link>
+
             {user?.is_admin && (
               <Link className="quick-action-card" to="/admin/google-oauth">
                 <strong>Google OAuth</strong>

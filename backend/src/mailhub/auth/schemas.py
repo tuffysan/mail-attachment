@@ -18,3 +18,18 @@ class UserResponse(BaseModel):
     display_name: str
     is_admin: bool
     is_active: bool
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=8, max_length=256)
+    new_password: str = Field(min_length=12, max_length=256)
+
+
+class AuditLogResponse(BaseModel):
+    id: str
+    action: str
+    entity_type: str | None
+    entity_id: str | None
+    details_json: str | None
+    remote_address: str | None
+    created_at: str

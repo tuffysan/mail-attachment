@@ -316,3 +316,14 @@ export interface BackupOverview {
   status: BackupStatus
   backups: BackupItem[]
 }
+
+
+export interface AuditLogItem {
+  id: string
+  action: string
+  entity_type: string | null
+  entity_id: string | null
+  details_json: string | null
+  remote_address: string | null
+  created_at: string
+}

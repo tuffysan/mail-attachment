@@ -81,6 +81,7 @@ async def change_bootstrap_password(
             detail="New password must be different",
         )
     user.password_hash = hash_password(request.new_password)
+    user.token_version += 1
     await session.commit()
 
 
