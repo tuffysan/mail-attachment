@@ -16,8 +16,8 @@ def upgrade() -> None:
     op.create_table(
         "api_keys",
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("name", sa.String(120), nullable=False),
         sa.Column("key_hash", sa.String(128), nullable=False),
         sa.Column("prefix", sa.String(16), nullable=False),
@@ -30,8 +30,8 @@ def upgrade() -> None:
     op.create_table(
         "notification_endpoints",
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("name", sa.String(120), nullable=False),
         sa.Column("provider", sa.String(40), nullable=False),
         sa.Column("encrypted_config", sa.Text(), nullable=False),
@@ -41,8 +41,8 @@ def upgrade() -> None:
     op.create_table(
         "audit_logs",
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("user_id", sa.Uuid(), nullable=True),
         sa.Column("action", sa.String(120), nullable=False),
         sa.Column("entity_type", sa.String(80), nullable=True),

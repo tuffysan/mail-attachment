@@ -18,8 +18,8 @@ def upgrade() -> None:
     op.create_table(
         "storage_destinations",
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("name", sa.String(120), nullable=False),
         sa.Column("provider", sa.String(40), server_default="local", nullable=False),
         sa.Column("base_path", sa.Text(), server_default="/data/routed", nullable=False),
@@ -32,8 +32,8 @@ def upgrade() -> None:
     op.create_table(
         "attachment_rules",
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("name", sa.String(160), nullable=False),
         sa.Column("email_account_id", sa.Uuid(), nullable=True),
         sa.Column("priority", sa.Integer(), server_default="100", nullable=False),
@@ -58,8 +58,8 @@ def upgrade() -> None:
     op.create_table(
         "rule_destinations",
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("rule_id", sa.Uuid(), nullable=False),
         sa.Column("destination_id", sa.Uuid(), nullable=False),
         sa.ForeignKeyConstraint(
@@ -79,8 +79,8 @@ def upgrade() -> None:
     op.create_table(
         "rule_executions",
         sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("rule_id", sa.Uuid(), nullable=False),
         sa.Column("attachment_id", sa.Uuid(), nullable=False),
         sa.Column("destination_id", sa.Uuid(), nullable=False),
