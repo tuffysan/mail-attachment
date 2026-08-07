@@ -60,7 +60,26 @@ echo "Current commit: ${CURRENT_COMMIT}"
 echo "Target commit:  ${TARGET_COMMIT}"
 
 log "Checking local changes"
-if [[ -n "$(git status --porcelain)" ]]; then
+LOCAL_CHANGES="$(git status --porcelain || true)"
+if [[ -n "$LOCAL_CHANGES" ]]; then
+  SAFE_REGEX='^( M|M |MM|A |AM| D|D ) scripts/(install-update-agent|lxc-update|update-agent)\.sh$'
+  ONLY_SAFE=1
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    if [[ ! "$line" =~ $SAFE_REGEX ]]; then
+      ONLY_SAFE=0
+      break
+    fi
+  done <<< "$LOCAL_CHANGES"
+
+  if [[ "$ONLY_SAFE" == "1" ]]; then
+    echo "Detected update-agent managed local changes."
+    git checkout --       scripts/install-update-agent.sh       scripts/lxc-update.sh       scripts/update-agent.sh || true
+    LOCAL_CHANGES="$(git status --porcelain || true)"
+  fi
+fi
+
+if [[ -n "$LOCAL_CHANGES" ]]; then
   echo "Local changes detected. Update aborted."
   git status --short
   exit 1
