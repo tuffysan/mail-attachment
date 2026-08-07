@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from mailhub.storage.crypto import decrypt_config, encrypt_config
-from mailhub.storage.rclone import test_destination, upload_file
+from mailhub.storage.rclone import test_destination as run_destination_test, upload_file
 
 
 def test_storage_config_round_trip() -> None:
@@ -14,7 +14,7 @@ def test_storage_config_round_trip() -> None:
 
 @pytest.mark.asyncio
 async def test_local_destination(tmp_path: Path) -> None:
-    result = await test_destination("local", str(tmp_path), {})
+    result = await run_destination_test("local", str(tmp_path), {})
     assert result.ok is True
 
 
